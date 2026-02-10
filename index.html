@@ -21,9 +21,11 @@
       color: #e0e0e0;
       min-height: 100vh;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       padding: 20px;
+      gap: 20px;
     }
 
     .container {
@@ -38,12 +40,9 @@
 
     /* ── Logo ── */
     .logo {
-      position: absolute;
-      top: 16px;
-      right: 16px;
-      max-width: 80px;
-      max-height: 80px;
-      border-radius: 8px;
+      max-width: 220px;
+      max-height: 220px;
+      border-radius: 12px;
       object-fit: contain;
     }
 
@@ -54,7 +53,7 @@
       margin-bottom: 28px;
       border-bottom: 2px solid #0f3460;
       padding-bottom: 0;
-      padding-right: 90px;
+      padding-right: 0;
     }
 
     .tab-btn {
@@ -601,10 +600,10 @@
   </style>
 </head>
 <body>
-  <div class="container">
-    <!-- Logo (top-right) -->
-    <img class="logo" src="MP3 Master Editor.png" alt="MP3 Master Editor" title="MP3 Master Editor">
+  <!-- Logo (above the app) -->
+  <img class="logo" src="MP3 Master Editor.png" alt="MP3 Master Editor" title="MP3 Master Editor">
 
+  <div class="container">
     <!-- Tab navigation -->
     <div class="tabs">
       <button class="tab-btn active" data-tab="repeater">MP3 Repeater</button>
@@ -743,8 +742,7 @@
 
         <!-- Toolbar -->
         <div class="editor-toolbar">
-          <button id="ed-playBtn">Play selection</button>
-          <button id="ed-stopBtn">Stop</button>
+          <button id="ed-playToggle">Play (Space)</button>
           <button id="ed-resetBtn">Reset trim</button>
           <button id="ed-fadeToggle">Fade In/Out</button>
         </div>
@@ -1532,8 +1530,7 @@
       const trimStartEl  = document.getElementById('ed-trimStart');
       const trimEndEl    = document.getElementById('ed-trimEnd');
       const trimDurEl    = document.getElementById('ed-trimDuration');
-      const playBtn      = document.getElementById('ed-playBtn');
-      const stopBtn      = document.getElementById('ed-stopBtn');
+      const playToggle   = document.getElementById('ed-playToggle');
       const resetBtn     = document.getElementById('ed-resetBtn');
       const fadeToggle   = document.getElementById('ed-fadeToggle');
       const fadeControls = document.getElementById('ed-fadeControls');
@@ -1560,6 +1557,7 @@
       let trimEndRatio = 1;
 
       // Playback state
+      let isPlaying = false;
       let playCtx = null;
       let playSource = null;
       let playStartTime = 0;
@@ -1645,6 +1643,13 @@
         const data = audioBuffer.getChannelData(0);
         const step = Math.max(1, Math.floor(data.length / w));
 
+        // Get fade settings to visualize on waveform
+        const fadeInSec = parseFloat(fadeInRange.value) || 0;
+        const fadeOutSec = parseFloat(fadeOutRange.value) || 0;
+        const trimStartSec = trimStartRatio * duration;
+        const trimEndSec = trimEndRatio * duration;
+        const selectionLen = trimEndSec - trimStartSec;
+
         ctx.clearRect(0, 0, w, h);
 
         // Draw center line
@@ -1655,8 +1660,7 @@
         ctx.lineTo(w, mid);
         ctx.stroke();
 
-        // Draw waveform
-        ctx.fillStyle = '#e94560';
+        // Draw waveform with fade effect applied visually
         for (let x = 0; x < w; x++) {
           const start = Math.floor(x * data.length / w);
           let min = 0, max = 0;
@@ -1665,8 +1669,32 @@
             if (val < min) min = val;
             if (val > max) max = val;
           }
-          const top = mid + min * mid;
-          const bottom = mid + max * mid;
+
+          // Calculate fade multiplier for this pixel position
+          const timeSec = (x / w) * duration;
+          let fadeMult = 1;
+          if (timeSec >= trimStartSec && timeSec <= trimEndSec) {
+            const posInSelection = timeSec - trimStartSec;
+            // Fade in
+            if (fadeInSec > 0 && posInSelection < fadeInSec) {
+              fadeMult = posInSelection / fadeInSec;
+            }
+            // Fade out
+            if (fadeOutSec > 0 && posInSelection > selectionLen - fadeOutSec) {
+              fadeMult = Math.min(fadeMult, (selectionLen - posInSelection) / fadeOutSec);
+            }
+          }
+
+          // Apply fade multiplier to waveform amplitude visually
+          const scaledMin = min * fadeMult;
+          const scaledMax = max * fadeMult;
+
+          const top = mid + scaledMin * mid;
+          const bottom = mid + scaledMax * mid;
+
+          // Color: dimmer in faded areas
+          const alpha = 0.3 + 0.7 * fadeMult;
+          ctx.fillStyle = 'rgba(233, 69, 96, ' + alpha.toFixed(2) + ')';
           ctx.fillRect(x, top, 1, bottom - top || 1);
         }
 
@@ -1772,9 +1800,11 @@
 
       fadeInRange.addEventListener('input', () => {
         fadeInVal.textContent = parseFloat(fadeInRange.value).toFixed(1) + 's';
+        if (audioBuffer) drawWaveform();
       });
       fadeOutRange.addEventListener('input', () => {
         fadeOutVal.textContent = parseFloat(fadeOutRange.value).toFixed(1) + 's';
+        if (audioBuffer) drawWaveform();
       });
 
       /* ── Playback ── */
@@ -1792,9 +1822,11 @@
           playAnimId = null;
         }
         playhead.classList.remove('active');
+        isPlaying = false;
+        playToggle.textContent = 'Play (Space)';
       }
 
-      playBtn.addEventListener('click', () => {
+      function startPlayback() {
         if (!audioBuffer) return;
         stopPlayback();
 
@@ -1836,6 +1868,9 @@
         playSource.connect(playCtx.destination);
         playSource.start();
 
+        isPlaying = true;
+        playToggle.textContent = 'Stop (Space)';
+
         playStartTime = playCtx.currentTime;
         playStartOffset = trimStartRatio;
         const selectionDuration = (trimEndRatio - trimStartRatio) * duration;
@@ -1856,9 +1891,31 @@
         animatePlayhead();
 
         playSource.onended = () => stopPlayback();
-      });
+      }
 
-      stopBtn.addEventListener('click', stopPlayback);
+      function togglePlayback() {
+        if (isPlaying) {
+          stopPlayback();
+        } else {
+          startPlayback();
+        }
+      }
+
+      playToggle.addEventListener('click', togglePlayback);
+
+      // Spacebar to toggle play/stop
+      document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && !e.repeat) {
+          // Don't intercept spacebar when focused on input/button/select elements
+          const tag = document.activeElement.tagName;
+          if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON') return;
+          // Only respond when the editor tab is active
+          if (!document.getElementById('tab-editor').classList.contains('active')) return;
+          if (!audioBuffer) return;
+          e.preventDefault();
+          togglePlayback();
+        }
+      });
 
       /* ── Export ── */
       exportBtn.addEventListener('click', async () => {
