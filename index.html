@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MP3 Repeater</title>
+  <title>MP3 Tools</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
   <style>
     * {
@@ -20,27 +20,72 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: 20px;
     }
 
     .container {
       background: #16213e;
       border-radius: 12px;
       padding: 40px;
-      max-width: 520px;
-      width: 90%;
+      max-width: 600px;
+      width: 100%;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     }
 
-    h1 {
-      font-size: 1.6rem;
-      margin-bottom: 8px;
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 28px;
+      border-bottom: 2px solid #0f3460;
+      padding-bottom: 0;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      border-bottom: 3px solid transparent;
+      border-radius: 8px 8px 0 0;
+      background: transparent;
+      color: #888;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s, background 0.2s;
+      width: auto;
+    }
+
+    .tab-btn:hover {
+      color: #ccc;
+      background: rgba(233, 69, 96, 0.05);
+    }
+
+    .tab-btn.active {
+      color: #e94560;
+      border-bottom-color: #e94560;
+      background: rgba(233, 69, 96, 0.08);
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    /* ── Shared styles ── */
+    h2 {
+      font-size: 1.4rem;
+      margin-bottom: 6px;
       color: #e94560;
     }
 
     .subtitle {
       font-size: 0.9rem;
       color: #888;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
     }
 
     .upload-area {
@@ -112,7 +157,7 @@
       color: #666;
     }
 
-    button {
+    button.action-btn {
       width: 100%;
       padding: 12px;
       border: none;
@@ -121,23 +166,20 @@
       font-weight: 600;
       cursor: pointer;
       transition: background 0.2s, transform 0.1s;
-    }
-
-    button:active {
-      transform: scale(0.98);
-    }
-
-    #processBtn {
       background: #e94560;
       color: #fff;
       margin-bottom: 12px;
     }
 
-    #processBtn:hover:not(:disabled) {
+    button.action-btn:active {
+      transform: scale(0.98);
+    }
+
+    button.action-btn:hover:not(:disabled) {
       background: #d63851;
     }
 
-    #processBtn:disabled {
+    button.action-btn:disabled {
       background: #555;
       cursor: not-allowed;
       transform: none;
@@ -235,97 +277,184 @@
     .error.active {
       display: block;
     }
+
+    /* ── Set List specific ── */
+    .file-list {
+      margin-bottom: 20px;
+    }
+
+    .file-list-title {
+      font-size: 0.9rem;
+      color: #aaa;
+      margin-bottom: 8px;
+    }
+
+    .file-list-items {
+      list-style: none;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+
+    .file-list-items li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      color: #ccc;
+      background: rgba(15, 52, 96, 0.4);
+      margin-bottom: 4px;
+    }
+
+    .file-list-items li .remove-btn {
+      background: none;
+      border: none;
+      color: #e94560;
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 0 4px;
+      width: auto;
+      margin: 0;
+      line-height: 1;
+    }
+
+    .file-list-items li .remove-btn:hover {
+      color: #ff6b81;
+    }
+
+    .setlist-slots {
+      margin-bottom: 24px;
+    }
+
+    .setlist-slots .slot {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .slot-number {
+      font-size: 0.9rem;
+      color: #e94560;
+      font-weight: 700;
+      min-width: 24px;
+      text-align: right;
+    }
+
+    .slot select {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #333;
+      border-radius: 6px;
+      background: #0f3460;
+      color: #e0e0e0;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    .slot select:focus {
+      outline: none;
+      border-color: #e94560;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>MP3 Repeater</h1>
-    <p class="subtitle">Upload an MP3, choose how many times it repeats, and download the result.</p>
-
-    <div class="upload-area" id="uploadArea">
-      <input type="file" id="fileInput" accept=".mp3,audio/mpeg">
-      <p class="upload-label">Click or drag an MP3 file here</p>
-      <p class="file-name" id="fileName"></p>
+    <!-- Tab navigation -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="repeater">MP3 Repeater</button>
+      <button class="tab-btn" data-tab="setlist">Set List Creator</button>
     </div>
 
-    <div class="controls">
-      <label for="repeatCount">Total plays:</label>
-      <input type="number" id="repeatCount" min="1" max="50" value="3">
-      <span class="hint">e.g. 3 = song plays 3 times</span>
+    <!-- ════════════════════════════════════════════ -->
+    <!-- Tab 1: MP3 Repeater (original)              -->
+    <!-- ════════════════════════════════════════════ -->
+    <div class="tab-panel active" id="tab-repeater">
+      <h2>MP3 Repeater</h2>
+      <p class="subtitle">Upload an MP3, choose how many times it repeats, and download the result.</p>
+
+      <div class="upload-area" id="rpt-uploadArea">
+        <input type="file" id="rpt-fileInput" accept=".mp3,audio/mpeg">
+        <p class="upload-label">Click or drag an MP3 file here</p>
+        <p class="file-name" id="rpt-fileName"></p>
+      </div>
+
+      <div class="controls">
+        <label for="rpt-repeatCount">Total plays:</label>
+        <input type="number" id="rpt-repeatCount" min="1" max="50" value="3">
+        <span class="hint">e.g. 3 = song plays 3 times</span>
+      </div>
+
+      <div class="error" id="rpt-errorBox"></div>
+
+      <button class="action-btn" id="rpt-processBtn" disabled>Select an MP3 first</button>
+
+      <div class="progress-wrap" id="rpt-progressWrap">
+        <div class="progress-bar"><div class="fill" id="rpt-progressFill"></div></div>
+        <p class="progress-text" id="rpt-progressText">Starting...</p>
+      </div>
+
+      <div class="result" id="rpt-result">
+        <a id="rpt-downloadLink" href="#" download="repeated.mp3">Download Repeated MP3</a>
+        <p class="info" id="rpt-resultInfo"></p>
+        <div class="preview">
+          <p class="preview-label">Preview:</p>
+          <audio id="rpt-audioPreview" controls></audio>
+        </div>
+      </div>
     </div>
 
-    <div class="error" id="errorBox"></div>
+    <!-- ════════════════════════════════════════════ -->
+    <!-- Tab 2: Set List Creator                     -->
+    <!-- ════════════════════════════════════════════ -->
+    <div class="tab-panel" id="tab-setlist">
+      <h2>Set List Creator</h2>
+      <p class="subtitle">Upload your MP3s, arrange them into a set list, and export as one combined MP3.</p>
 
-    <button id="processBtn" disabled>Select an MP3 first</button>
+      <div class="upload-area" id="sl-uploadArea">
+        <input type="file" id="sl-fileInput" accept=".mp3,audio/mpeg" multiple>
+        <p class="upload-label">Click or drag MP3 files here (multiple)</p>
+        <p class="file-name" id="sl-fileStatus"></p>
+      </div>
 
-    <div class="progress-wrap" id="progressWrap">
-      <div class="progress-bar"><div class="fill" id="progressFill"></div></div>
-      <p class="progress-text" id="progressText">Starting...</p>
-    </div>
+      <div class="file-list" id="sl-fileList" style="display:none;">
+        <p class="file-list-title">Uploaded songs:</p>
+        <ul class="file-list-items" id="sl-fileListItems"></ul>
+      </div>
 
-    <div class="result" id="result">
-      <a id="downloadLink" href="#" download="repeated.mp3">Download Repeated MP3</a>
-      <p class="info" id="resultInfo"></p>
-      <div class="preview">
-        <p class="preview-label">Preview:</p>
-        <audio id="audioPreview" controls></audio>
+      <div class="controls">
+        <label for="sl-songCount">Songs in set list:</label>
+        <input type="number" id="sl-songCount" min="1" max="100" value="3">
+        <button class="action-btn" id="sl-buildSlotsBtn" style="width:auto; padding:8px 16px; margin:0; font-size:0.85rem;">Update slots</button>
+      </div>
+
+      <div class="setlist-slots" id="sl-slots"></div>
+
+      <div class="error" id="sl-errorBox"></div>
+
+      <button class="action-btn" id="sl-processBtn" disabled>Upload songs &amp; build set list first</button>
+
+      <div class="progress-wrap" id="sl-progressWrap">
+        <div class="progress-bar"><div class="fill" id="sl-progressFill"></div></div>
+        <p class="progress-text" id="sl-progressText">Starting...</p>
+      </div>
+
+      <div class="result" id="sl-result">
+        <a id="sl-downloadLink" href="#" download="setlist.mp3">Download Set List MP3</a>
+        <p class="info" id="sl-resultInfo"></p>
+        <div class="preview">
+          <p class="preview-label">Preview:</p>
+          <audio id="sl-audioPreview" controls></audio>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
-    const fileInput = document.getElementById('fileInput');
-    const uploadArea = document.getElementById('uploadArea');
-    const fileName = document.getElementById('fileName');
-    const repeatCount = document.getElementById('repeatCount');
-    const processBtn = document.getElementById('processBtn');
-    const progressWrap = document.getElementById('progressWrap');
-    const progressFill = document.getElementById('progressFill');
-    const progressText = document.getElementById('progressText');
-    const result = document.getElementById('result');
-    const downloadLink = document.getElementById('downloadLink');
-    const resultInfo = document.getElementById('resultInfo');
-    const audioPreview = document.getElementById('audioPreview');
-    const errorBox = document.getElementById('errorBox');
-
-    let selectedFile = null;
-
-    // Upload area interactions
-    uploadArea.addEventListener('click', () => fileInput.click());
-
-    uploadArea.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      uploadArea.classList.add('dragover');
-    });
-
-    uploadArea.addEventListener('dragleave', () => {
-      uploadArea.classList.remove('dragover');
-    });
-
-    uploadArea.addEventListener('drop', (e) => {
-      e.preventDefault();
-      uploadArea.classList.remove('dragover');
-      const file = e.dataTransfer.files[0];
-      if (file) handleFile(file);
-    });
-
-    fileInput.addEventListener('change', () => {
-      if (fileInput.files[0]) handleFile(fileInput.files[0]);
-    });
-
-    function handleFile(file) {
-      if (!file.name.toLowerCase().endsWith('.mp3') && file.type !== 'audio/mpeg') {
-        showError('Please select an MP3 file.');
-        return;
-      }
-      selectedFile = file;
-      fileName.textContent = file.name + ' (' + formatSize(file.size) + ')';
-      uploadArea.classList.add('has-file');
-      processBtn.disabled = false;
-      processBtn.textContent = 'Create Repeated MP3';
-      result.classList.remove('active');
-      hideError();
-    }
+    /* ═══════════════════════════════════════════════
+       Shared utilities
+       ═══════════════════════════════════════════════ */
 
     function formatSize(bytes) {
       if (bytes < 1024) return bytes + ' B';
@@ -333,135 +462,52 @@
       return (bytes / 1048576).toFixed(1) + ' MB';
     }
 
-    function showError(msg) {
-      errorBox.textContent = msg;
-      errorBox.classList.add('active');
+    function showError(el, msg) {
+      el.textContent = msg;
+      el.classList.add('active');
     }
 
-    function hideError() {
-      errorBox.classList.remove('active');
+    function hideError(el) {
+      el.classList.remove('active');
     }
 
-    function setProgress(pct, text) {
-      progressFill.style.width = pct + '%';
-      progressText.textContent = text;
+    function setProgress(fillEl, textEl, pct, text) {
+      fillEl.style.width = pct + '%';
+      textEl.textContent = text;
     }
 
-    processBtn.addEventListener('click', async () => {
-      if (!selectedFile) return;
-
-      const repeats = parseInt(repeatCount.value, 10);
-      if (isNaN(repeats) || repeats < 1 || repeats > 50) {
-        showError('Please enter a repeat count between 1 and 50.');
-        return;
+    function floatTo16(floatArr) {
+      const int16 = new Int16Array(floatArr.length);
+      for (let i = 0; i < floatArr.length; i++) {
+        let s = floatArr[i];
+        s = s < -1 ? -1 : s > 1 ? 1 : s;
+        int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
       }
-
-      hideError();
-      processBtn.disabled = true;
-      processBtn.textContent = 'Processing...';
-      result.classList.remove('active');
-      progressWrap.classList.add('active');
-      setProgress(5, 'Reading file...');
-
-      try {
-        // Read the file as ArrayBuffer
-        const arrayBuffer = await selectedFile.arrayBuffer();
-        setProgress(15, 'Decoding audio...');
-
-        // Decode with Web Audio API
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-        audioCtx.close();
-
-        const sampleRate = audioBuffer.sampleRate;
-        const numChannels = audioBuffer.numberOfChannels;
-        const originalLength = audioBuffer.length;
-
-        // 0.5 second silence buffer between repeats
-        const silenceSamples = Math.floor(sampleRate * 0.5);
-        const totalLength = originalLength * repeats + silenceSamples * (repeats - 1);
-
-        setProgress(25, 'Building repeated audio...');
-
-        // Extract channel data
-        const channels = [];
-        for (let ch = 0; ch < numChannels; ch++) {
-          channels.push(audioBuffer.getChannelData(ch));
-        }
-
-        // Build repeated PCM data per channel
-        const repeatedChannels = [];
-        for (let ch = 0; ch < numChannels; ch++) {
-          const out = new Float32Array(totalLength);
-          let offset = 0;
-          for (let r = 0; r < repeats; r++) {
-            out.set(channels[ch], offset);
-            offset += originalLength;
-            if (r < repeats - 1) {
-              // silence gap is already zero-initialized
-              offset += silenceSamples;
-            }
-          }
-          repeatedChannels.push(out);
-        }
-
-        setProgress(40, 'Encoding to MP3...');
-
-        // Encode with lamejs
-        const mp3Data = await encodeMP3(repeatedChannels, sampleRate, numChannels, totalLength);
-
-        setProgress(95, 'Finalizing...');
-
-        const blob = new Blob(mp3Data, { type: 'audio/mpeg' });
-        const url = URL.createObjectURL(blob);
-
-        // Build output filename
-        const baseName = selectedFile.name.replace(/\.mp3$/i, '');
-        const outName = baseName + '_x' + repeats + '.mp3';
-
-        downloadLink.href = url;
-        downloadLink.download = outName;
-        audioPreview.src = url;
-
-        const durationSec = totalLength / sampleRate;
-        const minutes = Math.floor(durationSec / 60);
-        const seconds = Math.floor(durationSec % 60);
-        resultInfo.textContent = outName + ' — ' + formatSize(blob.size) + ' — ' + minutes + 'm ' + seconds + 's';
-
-        setProgress(100, 'Done!');
-        result.classList.add('active');
-      } catch (err) {
-        console.error(err);
-        showError('Error processing audio: ' + err.message);
-      } finally {
-        processBtn.disabled = false;
-        processBtn.textContent = 'Create Repeated MP3';
-        setTimeout(() => progressWrap.classList.remove('active'), 1500);
-      }
-    });
+      return int16;
+    }
 
     /**
      * Encode Float32 PCM channels to MP3 using lamejs.
-     * Processes in chunks to avoid blocking the UI and to allow progress updates.
+     * Yields to the event loop periodically so the UI stays responsive.
+     * progressCb(pct, text) is called with encode progress.
      */
-    function encodeMP3(channels, sampleRate, numChannels, totalSamples) {
+    function encodeMP3(channels, sampleRate, numChannels, totalSamples, progressCb) {
       return new Promise((resolve) => {
         const kbps = 192;
         const encoder = new lamejs.Mp3Encoder(numChannels, sampleRate, kbps);
         const mp3Chunks = [];
-        const chunkSize = 1152; // MPEG frame size
+        const chunkSize = 1152;
 
         let offset = 0;
         const isStereo = numChannels >= 2;
 
         function processChunk() {
-          const end = Math.min(offset + chunkSize * 100, totalSamples); // process 100 frames per tick
+          const end = Math.min(offset + chunkSize * 100, totalSamples);
 
           while (offset < end) {
             const remaining = totalSamples - offset;
             const len = Math.min(chunkSize, remaining);
 
-            // Convert float [-1,1] to Int16
             const leftF = channels[0].subarray(offset, offset + len);
             const left = floatTo16(leftF);
 
@@ -480,8 +526,9 @@
             offset += len;
           }
 
-          const pct = 40 + Math.floor((offset / totalSamples) * 55);
-          setProgress(pct, 'Encoding to MP3... ' + Math.floor((offset / totalSamples) * 100) + '%');
+          if (progressCb) {
+            progressCb(offset / totalSamples);
+          }
 
           if (offset < totalSamples) {
             setTimeout(processChunk, 0);
@@ -498,15 +545,441 @@
       });
     }
 
-    function floatTo16(floatArr) {
-      const int16 = new Int16Array(floatArr.length);
-      for (let i = 0; i < floatArr.length; i++) {
-        let s = floatArr[i];
-        s = s < -1 ? -1 : s > 1 ? 1 : s;
-        int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    /* ═══════════════════════════════════════════════
+       Tab switching
+       ═══════════════════════════════════════════════ */
+
+    document.querySelectorAll('.tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    /* ═══════════════════════════════════════════════
+       Tab 1: MP3 Repeater
+       ═══════════════════════════════════════════════ */
+    (function repeaterTab() {
+      const uploadArea = document.getElementById('rpt-uploadArea');
+      const fileInput  = document.getElementById('rpt-fileInput');
+      const fileNameEl = document.getElementById('rpt-fileName');
+      const repeatInput = document.getElementById('rpt-repeatCount');
+      const processBtn = document.getElementById('rpt-processBtn');
+      const progressWrap = document.getElementById('rpt-progressWrap');
+      const progressFill = document.getElementById('rpt-progressFill');
+      const progressTextEl = document.getElementById('rpt-progressText');
+      const resultDiv  = document.getElementById('rpt-result');
+      const dlLink     = document.getElementById('rpt-downloadLink');
+      const resultInfo = document.getElementById('rpt-resultInfo');
+      const audioPreview = document.getElementById('rpt-audioPreview');
+      const errorBox   = document.getElementById('rpt-errorBox');
+
+      let selectedFile = null;
+
+      function sp(pct, text) { setProgress(progressFill, progressTextEl, pct, text); }
+
+      uploadArea.addEventListener('click', () => fileInput.click());
+      uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+      uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+      uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+      });
+      fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+      function handleFile(file) {
+        if (!file.name.toLowerCase().endsWith('.mp3') && file.type !== 'audio/mpeg') {
+          showError(errorBox, 'Please select an MP3 file.');
+          return;
+        }
+        selectedFile = file;
+        fileNameEl.textContent = file.name + ' (' + formatSize(file.size) + ')';
+        uploadArea.classList.add('has-file');
+        processBtn.disabled = false;
+        processBtn.textContent = 'Create Repeated MP3';
+        resultDiv.classList.remove('active');
+        hideError(errorBox);
       }
-      return int16;
-    }
+
+      processBtn.addEventListener('click', async () => {
+        if (!selectedFile) return;
+        const repeats = parseInt(repeatInput.value, 10);
+        if (isNaN(repeats) || repeats < 1 || repeats > 50) {
+          showError(errorBox, 'Please enter a repeat count between 1 and 50.');
+          return;
+        }
+
+        hideError(errorBox);
+        processBtn.disabled = true;
+        processBtn.textContent = 'Processing...';
+        resultDiv.classList.remove('active');
+        progressWrap.classList.add('active');
+        sp(5, 'Reading file...');
+
+        try {
+          const arrayBuffer = await selectedFile.arrayBuffer();
+          sp(15, 'Decoding audio...');
+
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+          audioCtx.close();
+
+          const sampleRate = audioBuffer.sampleRate;
+          const numChannels = audioBuffer.numberOfChannels;
+          const originalLength = audioBuffer.length;
+          const silenceSamples = Math.floor(sampleRate * 0.5);
+          const totalLength = originalLength * repeats + silenceSamples * (repeats - 1);
+
+          sp(25, 'Building repeated audio...');
+
+          const channels = [];
+          for (let ch = 0; ch < numChannels; ch++) channels.push(audioBuffer.getChannelData(ch));
+
+          const repeatedChannels = [];
+          for (let ch = 0; ch < numChannels; ch++) {
+            const out = new Float32Array(totalLength);
+            let offset = 0;
+            for (let r = 0; r < repeats; r++) {
+              out.set(channels[ch], offset);
+              offset += originalLength;
+              if (r < repeats - 1) offset += silenceSamples;
+            }
+            repeatedChannels.push(out);
+          }
+
+          sp(40, 'Encoding to MP3...');
+
+          const mp3Data = await encodeMP3(repeatedChannels, sampleRate, numChannels, totalLength, (ratio) => {
+            sp(40 + Math.floor(ratio * 55), 'Encoding to MP3... ' + Math.floor(ratio * 100) + '%');
+          });
+
+          sp(95, 'Finalizing...');
+
+          const blob = new Blob(mp3Data, { type: 'audio/mpeg' });
+          const url = URL.createObjectURL(blob);
+          const baseName = selectedFile.name.replace(/\.mp3$/i, '');
+          const outName = baseName + '_x' + repeats + '.mp3';
+
+          dlLink.href = url;
+          dlLink.download = outName;
+          audioPreview.src = url;
+
+          const durationSec = totalLength / sampleRate;
+          resultInfo.textContent = outName + ' — ' + formatSize(blob.size) + ' — ' + Math.floor(durationSec / 60) + 'm ' + Math.floor(durationSec % 60) + 's';
+
+          sp(100, 'Done!');
+          resultDiv.classList.add('active');
+        } catch (err) {
+          console.error(err);
+          showError(errorBox, 'Error processing audio: ' + err.message);
+        } finally {
+          processBtn.disabled = false;
+          processBtn.textContent = 'Create Repeated MP3';
+          setTimeout(() => progressWrap.classList.remove('active'), 1500);
+        }
+      });
+    })();
+
+    /* ═══════════════════════════════════════════════
+       Tab 2: Set List Creator
+       ═══════════════════════════════════════════════ */
+    (function setListTab() {
+      const uploadArea  = document.getElementById('sl-uploadArea');
+      const fileInput   = document.getElementById('sl-fileInput');
+      const fileStatus  = document.getElementById('sl-fileStatus');
+      const fileListDiv = document.getElementById('sl-fileList');
+      const fileListUl  = document.getElementById('sl-fileListItems');
+      const songCountIn = document.getElementById('sl-songCount');
+      const buildBtn    = document.getElementById('sl-buildSlotsBtn');
+      const slotsDiv    = document.getElementById('sl-slots');
+      const processBtn  = document.getElementById('sl-processBtn');
+      const progressWrap = document.getElementById('sl-progressWrap');
+      const progressFill = document.getElementById('sl-progressFill');
+      const progressTextEl = document.getElementById('sl-progressText');
+      const resultDiv   = document.getElementById('sl-result');
+      const dlLink      = document.getElementById('sl-downloadLink');
+      const resultInfo  = document.getElementById('sl-resultInfo');
+      const audioPreview = document.getElementById('sl-audioPreview');
+      const errorBox    = document.getElementById('sl-errorBox');
+
+      // Map of name -> File object
+      let uploadedSongs = new Map();
+
+      function sp(pct, text) { setProgress(progressFill, progressTextEl, pct, text); }
+
+      /* ── File upload handling ── */
+      uploadArea.addEventListener('click', () => fileInput.click());
+      uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+      uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+      uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        handleFiles(e.dataTransfer.files);
+      });
+      fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+      function handleFiles(files) {
+        let added = 0;
+        for (const file of files) {
+          if (file.name.toLowerCase().endsWith('.mp3') || file.type === 'audio/mpeg') {
+            uploadedSongs.set(file.name, file);
+            added++;
+          }
+        }
+        if (added === 0) {
+          showError(errorBox, 'No MP3 files found in selection.');
+          return;
+        }
+        hideError(errorBox);
+        refreshFileList();
+        refreshSlotDropdowns();
+        uploadArea.classList.add('has-file');
+        fileStatus.textContent = uploadedSongs.size + ' song' + (uploadedSongs.size !== 1 ? 's' : '') + ' loaded';
+        updateProcessBtnState();
+      }
+
+      function refreshFileList() {
+        fileListUl.innerHTML = '';
+        if (uploadedSongs.size === 0) {
+          fileListDiv.style.display = 'none';
+          return;
+        }
+        fileListDiv.style.display = 'block';
+        for (const [name, file] of uploadedSongs) {
+          const li = document.createElement('li');
+
+          const span = document.createElement('span');
+          span.textContent = name + ' (' + formatSize(file.size) + ')';
+          li.appendChild(span);
+
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'remove-btn';
+          removeBtn.textContent = '\u00d7';
+          removeBtn.title = 'Remove';
+          removeBtn.addEventListener('click', () => {
+            uploadedSongs.delete(name);
+            refreshFileList();
+            refreshSlotDropdowns();
+            fileStatus.textContent = uploadedSongs.size + ' song' + (uploadedSongs.size !== 1 ? 's' : '') + ' loaded';
+            if (uploadedSongs.size === 0) {
+              uploadArea.classList.remove('has-file');
+              fileStatus.textContent = '';
+            }
+            updateProcessBtnState();
+          });
+          li.appendChild(removeBtn);
+          fileListUl.appendChild(li);
+        }
+      }
+
+      /* ── Slot management ── */
+      function buildSlots() {
+        const count = parseInt(songCountIn.value, 10);
+        if (isNaN(count) || count < 1 || count > 100) {
+          showError(errorBox, 'Enter a set list size between 1 and 100.');
+          return;
+        }
+        hideError(errorBox);
+
+        // Preserve existing selections where possible
+        const existing = [];
+        slotsDiv.querySelectorAll('select').forEach(sel => existing.push(sel.value));
+
+        slotsDiv.innerHTML = '';
+        const names = [...uploadedSongs.keys()];
+
+        for (let i = 0; i < count; i++) {
+          const slot = document.createElement('div');
+          slot.className = 'slot';
+
+          const num = document.createElement('span');
+          num.className = 'slot-number';
+          num.textContent = (i + 1) + '.';
+          slot.appendChild(num);
+
+          const select = document.createElement('select');
+          select.dataset.slot = i;
+
+          // Placeholder
+          const placeholder = document.createElement('option');
+          placeholder.value = '';
+          placeholder.textContent = '— choose a song —';
+          select.appendChild(placeholder);
+
+          names.forEach((name) => {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name.replace(/\.mp3$/i, '');
+            select.appendChild(opt);
+          });
+
+          // Restore previous selection if slot existed
+          if (existing[i] && uploadedSongs.has(existing[i])) {
+            select.value = existing[i];
+          } else if (names[i]) {
+            // Default: fill sequentially from uploaded list
+            select.value = names[i];
+          }
+
+          slot.appendChild(select);
+          slotsDiv.appendChild(slot);
+        }
+        updateProcessBtnState();
+      }
+
+      function refreshSlotDropdowns() {
+        const names = [...uploadedSongs.keys()];
+        slotsDiv.querySelectorAll('select').forEach((select) => {
+          const current = select.value;
+          // Remove all non-placeholder options
+          while (select.options.length > 1) select.remove(1);
+
+          names.forEach((name) => {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name.replace(/\.mp3$/i, '');
+            select.appendChild(opt);
+          });
+
+          if (uploadedSongs.has(current)) {
+            select.value = current;
+          } else {
+            select.value = '';
+          }
+        });
+        updateProcessBtnState();
+      }
+
+      buildBtn.addEventListener('click', buildSlots);
+      songCountIn.addEventListener('change', buildSlots);
+
+      // Auto-build initial slots
+      buildSlots();
+
+      function updateProcessBtnState() {
+        const selects = slotsDiv.querySelectorAll('select');
+        const allFilled = selects.length > 0 && [...selects].every(s => s.value !== '');
+        const hasSongs = uploadedSongs.size > 0;
+
+        if (!hasSongs) {
+          processBtn.disabled = true;
+          processBtn.textContent = 'Upload songs first';
+        } else if (!allFilled) {
+          processBtn.disabled = true;
+          processBtn.textContent = 'Fill all set list slots';
+        } else {
+          processBtn.disabled = false;
+          processBtn.textContent = 'Create Set List MP3';
+        }
+      }
+
+      /* ── Processing ── */
+      processBtn.addEventListener('click', async () => {
+        // Gather the ordered list of song names
+        const selects = slotsDiv.querySelectorAll('select');
+        const songOrder = [...selects].map(s => s.value);
+
+        if (songOrder.some(n => !n || !uploadedSongs.has(n))) {
+          showError(errorBox, 'Please fill every slot with a song.');
+          return;
+        }
+
+        hideError(errorBox);
+        processBtn.disabled = true;
+        processBtn.textContent = 'Processing...';
+        resultDiv.classList.remove('active');
+        progressWrap.classList.add('active');
+        sp(2, 'Reading files...');
+
+        try {
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+          // Decode all unique files (cache to avoid decoding the same file twice)
+          const decodedCache = new Map();
+          const uniqueNames = [...new Set(songOrder)];
+
+          for (let i = 0; i < uniqueNames.length; i++) {
+            const name = uniqueNames[i];
+            sp(2 + Math.floor((i / uniqueNames.length) * 20), 'Decoding: ' + name.replace(/\.mp3$/i, '') + '...');
+            const buf = await uploadedSongs.get(name).arrayBuffer();
+            const decoded = await audioCtx.decodeAudioData(buf);
+            decodedCache.set(name, decoded);
+          }
+
+          audioCtx.close();
+
+          sp(25, 'Building set list...');
+
+          // Determine output format: use max channels & first song's sample rate
+          // (lamejs requires consistent sample rate, so we'll use the first song's rate;
+          //  the Web Audio API will have decoded everything at its native rate)
+          const firstBuffer = decodedCache.get(songOrder[0]);
+          const sampleRate = firstBuffer.sampleRate;
+          const numChannels = Math.max(...[...decodedCache.values()].map(b => b.numberOfChannels));
+
+          // 1 second silence buffer between songs
+          const silenceSamples = Math.floor(sampleRate * 1.0);
+
+          // Calculate total length
+          let totalLength = 0;
+          for (let i = 0; i < songOrder.length; i++) {
+            totalLength += decodedCache.get(songOrder[i]).length;
+            if (i < songOrder.length - 1) totalLength += silenceSamples;
+          }
+
+          // Build combined PCM per channel
+          const combined = [];
+          for (let ch = 0; ch < numChannels; ch++) {
+            const out = new Float32Array(totalLength);
+            let offset = 0;
+            for (let i = 0; i < songOrder.length; i++) {
+              const buf = decodedCache.get(songOrder[i]);
+              // If this buffer has fewer channels, duplicate channel 0
+              const srcCh = ch < buf.numberOfChannels ? ch : 0;
+              const data = buf.getChannelData(srcCh);
+              out.set(data, offset);
+              offset += buf.length;
+              if (i < songOrder.length - 1) offset += silenceSamples;
+            }
+            combined.push(out);
+          }
+
+          sp(35, 'Encoding to MP3...');
+
+          const mp3Data = await encodeMP3(combined, sampleRate, numChannels, totalLength, (ratio) => {
+            sp(35 + Math.floor(ratio * 60), 'Encoding to MP3... ' + Math.floor(ratio * 100) + '%');
+          });
+
+          sp(96, 'Finalizing...');
+
+          const blob = new Blob(mp3Data, { type: 'audio/mpeg' });
+          const url = URL.createObjectURL(blob);
+          const outName = 'setlist_' + songOrder.length + '_songs.mp3';
+
+          dlLink.href = url;
+          dlLink.download = outName;
+          audioPreview.src = url;
+
+          const durationSec = totalLength / sampleRate;
+          const mins = Math.floor(durationSec / 60);
+          const secs = Math.floor(durationSec % 60);
+          resultInfo.textContent = outName + ' — ' + formatSize(blob.size) + ' — ' + mins + 'm ' + secs + 's — ' + songOrder.length + ' songs';
+
+          sp(100, 'Done!');
+          resultDiv.classList.add('active');
+        } catch (err) {
+          console.error(err);
+          showError(errorBox, 'Error processing audio: ' + err.message);
+        } finally {
+          processBtn.disabled = false;
+          processBtn.textContent = 'Create Set List MP3';
+          setTimeout(() => progressWrap.classList.remove('active'), 1500);
+        }
+      });
+    })();
   </script>
 </body>
 </html>
