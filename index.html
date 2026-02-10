@@ -1,1 +1,512 @@
-Test
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MP3 Repeater</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .container {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 40px;
+      max-width: 520px;
+      width: 90%;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      margin-bottom: 8px;
+      color: #e94560;
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: #888;
+      margin-bottom: 28px;
+    }
+
+    .upload-area {
+      border: 2px dashed #333;
+      border-radius: 8px;
+      padding: 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      margin-bottom: 20px;
+    }
+
+    .upload-area:hover, .upload-area.dragover {
+      border-color: #e94560;
+      background: rgba(233, 69, 96, 0.05);
+    }
+
+    .upload-area.has-file {
+      border-color: #4ecca3;
+      background: rgba(78, 204, 163, 0.05);
+    }
+
+    .upload-area input[type="file"] {
+      display: none;
+    }
+
+    .upload-label {
+      font-size: 0.95rem;
+      color: #aaa;
+    }
+
+    .file-name {
+      margin-top: 8px;
+      font-size: 0.85rem;
+      color: #4ecca3;
+      word-break: break-all;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .controls label {
+      font-size: 0.95rem;
+      white-space: nowrap;
+    }
+
+    .controls input[type="number"] {
+      width: 80px;
+      padding: 8px 12px;
+      border: 1px solid #333;
+      border-radius: 6px;
+      background: #0f3460;
+      color: #e0e0e0;
+      font-size: 1rem;
+      text-align: center;
+    }
+
+    .controls input[type="number"]:focus {
+      outline: none;
+      border-color: #e94560;
+    }
+
+    .hint {
+      font-size: 0.8rem;
+      color: #666;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    #processBtn {
+      background: #e94560;
+      color: #fff;
+      margin-bottom: 12px;
+    }
+
+    #processBtn:hover:not(:disabled) {
+      background: #d63851;
+    }
+
+    #processBtn:disabled {
+      background: #555;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .progress-wrap {
+      display: none;
+      margin-bottom: 20px;
+    }
+
+    .progress-wrap.active {
+      display: block;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: #333;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .progress-bar .fill {
+      height: 100%;
+      width: 0%;
+      background: #e94560;
+      border-radius: 3px;
+      transition: width 0.15s;
+    }
+
+    .progress-text {
+      font-size: 0.85rem;
+      color: #aaa;
+      text-align: center;
+    }
+
+    .result {
+      display: none;
+      text-align: center;
+      margin-top: 16px;
+    }
+
+    .result.active {
+      display: block;
+    }
+
+    .result a {
+      display: inline-block;
+      padding: 12px 28px;
+      background: #4ecca3;
+      color: #1a1a2e;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: background 0.2s;
+    }
+
+    .result a:hover {
+      background: #3db890;
+    }
+
+    .result .info {
+      margin-top: 10px;
+      font-size: 0.82rem;
+      color: #888;
+    }
+
+    .preview {
+      margin-top: 16px;
+    }
+
+    .preview audio {
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    .preview-label {
+      font-size: 0.85rem;
+      color: #888;
+    }
+
+    .error {
+      display: none;
+      background: rgba(233, 69, 96, 0.15);
+      border: 1px solid #e94560;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+      color: #e94560;
+    }
+
+    .error.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>MP3 Repeater</h1>
+    <p class="subtitle">Upload an MP3, choose how many times it repeats, and download the result.</p>
+
+    <div class="upload-area" id="uploadArea">
+      <input type="file" id="fileInput" accept=".mp3,audio/mpeg">
+      <p class="upload-label">Click or drag an MP3 file here</p>
+      <p class="file-name" id="fileName"></p>
+    </div>
+
+    <div class="controls">
+      <label for="repeatCount">Total plays:</label>
+      <input type="number" id="repeatCount" min="1" max="50" value="3">
+      <span class="hint">e.g. 3 = song plays 3 times</span>
+    </div>
+
+    <div class="error" id="errorBox"></div>
+
+    <button id="processBtn" disabled>Select an MP3 first</button>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-bar"><div class="fill" id="progressFill"></div></div>
+      <p class="progress-text" id="progressText">Starting...</p>
+    </div>
+
+    <div class="result" id="result">
+      <a id="downloadLink" href="#" download="repeated.mp3">Download Repeated MP3</a>
+      <p class="info" id="resultInfo"></p>
+      <div class="preview">
+        <p class="preview-label">Preview:</p>
+        <audio id="audioPreview" controls></audio>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const uploadArea = document.getElementById('uploadArea');
+    const fileName = document.getElementById('fileName');
+    const repeatCount = document.getElementById('repeatCount');
+    const processBtn = document.getElementById('processBtn');
+    const progressWrap = document.getElementById('progressWrap');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    const result = document.getElementById('result');
+    const downloadLink = document.getElementById('downloadLink');
+    const resultInfo = document.getElementById('resultInfo');
+    const audioPreview = document.getElementById('audioPreview');
+    const errorBox = document.getElementById('errorBox');
+
+    let selectedFile = null;
+
+    // Upload area interactions
+    uploadArea.addEventListener('click', () => fileInput.click());
+
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+      uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    });
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) handleFile(fileInput.files[0]);
+    });
+
+    function handleFile(file) {
+      if (!file.name.toLowerCase().endsWith('.mp3') && file.type !== 'audio/mpeg') {
+        showError('Please select an MP3 file.');
+        return;
+      }
+      selectedFile = file;
+      fileName.textContent = file.name + ' (' + formatSize(file.size) + ')';
+      uploadArea.classList.add('has-file');
+      processBtn.disabled = false;
+      processBtn.textContent = 'Create Repeated MP3';
+      result.classList.remove('active');
+      hideError();
+    }
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    function showError(msg) {
+      errorBox.textContent = msg;
+      errorBox.classList.add('active');
+    }
+
+    function hideError() {
+      errorBox.classList.remove('active');
+    }
+
+    function setProgress(pct, text) {
+      progressFill.style.width = pct + '%';
+      progressText.textContent = text;
+    }
+
+    processBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+
+      const repeats = parseInt(repeatCount.value, 10);
+      if (isNaN(repeats) || repeats < 1 || repeats > 50) {
+        showError('Please enter a repeat count between 1 and 50.');
+        return;
+      }
+
+      hideError();
+      processBtn.disabled = true;
+      processBtn.textContent = 'Processing...';
+      result.classList.remove('active');
+      progressWrap.classList.add('active');
+      setProgress(5, 'Reading file...');
+
+      try {
+        // Read the file as ArrayBuffer
+        const arrayBuffer = await selectedFile.arrayBuffer();
+        setProgress(15, 'Decoding audio...');
+
+        // Decode with Web Audio API
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        audioCtx.close();
+
+        const sampleRate = audioBuffer.sampleRate;
+        const numChannels = audioBuffer.numberOfChannels;
+        const originalLength = audioBuffer.length;
+
+        // 0.5 second silence buffer between repeats
+        const silenceSamples = Math.floor(sampleRate * 0.5);
+        const totalLength = originalLength * repeats + silenceSamples * (repeats - 1);
+
+        setProgress(25, 'Building repeated audio...');
+
+        // Extract channel data
+        const channels = [];
+        for (let ch = 0; ch < numChannels; ch++) {
+          channels.push(audioBuffer.getChannelData(ch));
+        }
+
+        // Build repeated PCM data per channel
+        const repeatedChannels = [];
+        for (let ch = 0; ch < numChannels; ch++) {
+          const out = new Float32Array(totalLength);
+          let offset = 0;
+          for (let r = 0; r < repeats; r++) {
+            out.set(channels[ch], offset);
+            offset += originalLength;
+            if (r < repeats - 1) {
+              // silence gap is already zero-initialized
+              offset += silenceSamples;
+            }
+          }
+          repeatedChannels.push(out);
+        }
+
+        setProgress(40, 'Encoding to MP3...');
+
+        // Encode with lamejs
+        const mp3Data = await encodeMP3(repeatedChannels, sampleRate, numChannels, totalLength);
+
+        setProgress(95, 'Finalizing...');
+
+        const blob = new Blob(mp3Data, { type: 'audio/mpeg' });
+        const url = URL.createObjectURL(blob);
+
+        // Build output filename
+        const baseName = selectedFile.name.replace(/\.mp3$/i, '');
+        const outName = baseName + '_x' + repeats + '.mp3';
+
+        downloadLink.href = url;
+        downloadLink.download = outName;
+        audioPreview.src = url;
+
+        const durationSec = totalLength / sampleRate;
+        const minutes = Math.floor(durationSec / 60);
+        const seconds = Math.floor(durationSec % 60);
+        resultInfo.textContent = outName + ' — ' + formatSize(blob.size) + ' — ' + minutes + 'm ' + seconds + 's';
+
+        setProgress(100, 'Done!');
+        result.classList.add('active');
+      } catch (err) {
+        console.error(err);
+        showError('Error processing audio: ' + err.message);
+      } finally {
+        processBtn.disabled = false;
+        processBtn.textContent = 'Create Repeated MP3';
+        setTimeout(() => progressWrap.classList.remove('active'), 1500);
+      }
+    });
+
+    /**
+     * Encode Float32 PCM channels to MP3 using lamejs.
+     * Processes in chunks to avoid blocking the UI and to allow progress updates.
+     */
+    function encodeMP3(channels, sampleRate, numChannels, totalSamples) {
+      return new Promise((resolve) => {
+        const kbps = 192;
+        const encoder = new lamejs.Mp3Encoder(numChannels, sampleRate, kbps);
+        const mp3Chunks = [];
+        const chunkSize = 1152; // MPEG frame size
+
+        let offset = 0;
+        const isStereo = numChannels >= 2;
+
+        function processChunk() {
+          const end = Math.min(offset + chunkSize * 100, totalSamples); // process 100 frames per tick
+
+          while (offset < end) {
+            const remaining = totalSamples - offset;
+            const len = Math.min(chunkSize, remaining);
+
+            // Convert float [-1,1] to Int16
+            const leftF = channels[0].subarray(offset, offset + len);
+            const left = floatTo16(leftF);
+
+            let mp3buf;
+            if (isStereo) {
+              const rightF = channels[1].subarray(offset, offset + len);
+              const right = floatTo16(rightF);
+              mp3buf = encoder.encodeBuffer(left, right);
+            } else {
+              mp3buf = encoder.encodeBuffer(left);
+            }
+
+            if (mp3buf.length > 0) {
+              mp3Chunks.push(mp3buf);
+            }
+            offset += len;
+          }
+
+          const pct = 40 + Math.floor((offset / totalSamples) * 55);
+          setProgress(pct, 'Encoding to MP3... ' + Math.floor((offset / totalSamples) * 100) + '%');
+
+          if (offset < totalSamples) {
+            setTimeout(processChunk, 0);
+          } else {
+            const flush = encoder.flush();
+            if (flush.length > 0) {
+              mp3Chunks.push(flush);
+            }
+            resolve(mp3Chunks);
+          }
+        }
+
+        processChunk();
+      });
+    }
+
+    function floatTo16(floatArr) {
+      const int16 = new Int16Array(floatArr.length);
+      for (let i = 0; i < floatArr.length; i++) {
+        let s = floatArr[i];
+        s = s < -1 ? -1 : s > 1 ? 1 : s;
+        int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      }
+      return int16;
+    }
+  </script>
+</body>
+</html>
