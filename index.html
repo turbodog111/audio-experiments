@@ -30,7 +30,7 @@
       background: #16213e;
       border-radius: 12px;
       padding: 40px;
-      max-width: 600px;
+      max-width: 750px;
       width: 100%;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
       position: relative;
@@ -59,13 +59,13 @@
 
     .tab-btn {
       flex: 1;
-      padding: 10px 16px;
+      padding: 10px 10px;
       border: none;
       border-bottom: 3px solid transparent;
       border-radius: 8px 8px 0 0;
       background: transparent;
       color: #888;
-      font-size: 0.95rem;
+      font-size: 0.85rem;
       font-weight: 600;
       cursor: pointer;
       transition: color 0.2s, border-color 0.2s, background 0.2s;
@@ -429,6 +429,175 @@
       outline: none;
       border-color: #e94560;
     }
+
+    /* ── MP3 Editor ── */
+    .editor-workspace {
+      display: none;
+    }
+
+    .editor-workspace.active {
+      display: block;
+    }
+
+    .waveform-wrap {
+      position: relative;
+      margin-bottom: 8px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .waveform-wrap canvas {
+      width: 100%;
+      height: 120px;
+      display: block;
+      border-radius: 6px;
+      background: #0a0a1a;
+      cursor: crosshair;
+    }
+
+    /* Trim overlay regions */
+    .trim-overlay-left, .trim-overlay-right {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.55);
+      pointer-events: none;
+      border-radius: 6px;
+    }
+
+    .trim-overlay-left { left: 0; }
+    .trim-overlay-right { right: 0; }
+
+    /* Trim handles */
+    .trim-handle {
+      position: absolute;
+      top: 0;
+      width: 8px;
+      height: 100%;
+      cursor: ew-resize;
+      z-index: 5;
+    }
+
+    .trim-handle::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      width: 3px;
+      height: 100%;
+      border-radius: 2px;
+    }
+
+    .trim-handle-left {
+      transform: translateX(-4px);
+    }
+
+    .trim-handle-left::after {
+      left: 3px;
+      background: #4ecca3;
+    }
+
+    .trim-handle-right {
+      transform: translateX(-4px);
+    }
+
+    .trim-handle-right::after {
+      right: 3px;
+      background: #e94560;
+    }
+
+    /* Playhead */
+    .playhead {
+      position: absolute;
+      top: 0;
+      width: 2px;
+      height: 100%;
+      background: #fff;
+      pointer-events: none;
+      z-index: 4;
+      display: none;
+    }
+
+    .playhead.active {
+      display: block;
+    }
+
+    .trim-times {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: #888;
+      margin-bottom: 16px;
+      padding: 0 2px;
+    }
+
+    .trim-times .time-green { color: #4ecca3; }
+    .trim-times .time-red   { color: #e94560; }
+
+    .editor-toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .editor-toolbar button {
+      padding: 7px 14px;
+      border: 1px solid #333;
+      border-radius: 6px;
+      background: #0f3460;
+      color: #e0e0e0;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+      width: auto;
+      margin: 0;
+    }
+
+    .editor-toolbar button:hover {
+      background: #1a4a8a;
+      border-color: #4285f4;
+    }
+
+    .editor-toolbar button.active-effect {
+      border-color: #4ecca3;
+      background: rgba(78, 204, 163, 0.15);
+      color: #4ecca3;
+    }
+
+    .effect-controls {
+      display: none;
+      margin-bottom: 20px;
+    }
+
+    .effect-controls.active {
+      display: block;
+    }
+
+    .effect-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .effect-row label {
+      font-size: 0.85rem;
+      min-width: 80px;
+      color: #aaa;
+    }
+
+    .effect-row input[type="range"] {
+      flex: 1;
+      accent-color: #e94560;
+    }
+
+    .effect-row .range-val {
+      font-size: 0.82rem;
+      color: #4ecca3;
+      min-width: 36px;
+      text-align: right;
+    }
   </style>
 </head>
 <body>
@@ -440,6 +609,7 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="repeater">MP3 Repeater</button>
       <button class="tab-btn" data-tab="setlist">Set List Creator</button>
+      <button class="tab-btn" data-tab="editor">MP3 Editor</button>
     </div>
 
     <!-- ════════════════════════════════════════════ -->
@@ -531,6 +701,83 @@
         <div class="preview">
           <p class="preview-label">Preview:</p>
           <audio id="sl-audioPreview" controls></audio>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════ -->
+    <!-- Tab 3: MP3 Editor                           -->
+    <!-- ════════════════════════════════════════════ -->
+    <div class="tab-panel" id="tab-editor">
+      <h2>MP3 Editor</h2>
+      <p class="subtitle">Trim, crop, and add fade effects to a single MP3.</p>
+
+      <div class="upload-area" id="ed-uploadArea">
+        <input type="file" id="ed-fileInput" accept=".mp3,audio/mpeg">
+        <p class="upload-label">Click or drag an MP3 file here</p>
+        <p class="file-name" id="ed-fileName"></p>
+      </div>
+      <div class="upload-alt">
+        or <button class="gdrive-btn" id="ed-gdriveBtn" disabled>Import from Google Drive</button>
+      </div>
+
+      <div class="gdrive-notice" id="ed-gdriveNotice"></div>
+      <div class="error" id="ed-errorBox"></div>
+
+      <div class="editor-workspace" id="ed-workspace">
+        <!-- Waveform -->
+        <div class="waveform-wrap" id="ed-waveformWrap">
+          <canvas id="ed-canvas"></canvas>
+          <div class="trim-overlay-left" id="ed-overlayLeft"></div>
+          <div class="trim-overlay-right" id="ed-overlayRight"></div>
+          <div class="trim-handle trim-handle-left" id="ed-handleLeft"></div>
+          <div class="trim-handle trim-handle-right" id="ed-handleRight"></div>
+          <div class="playhead" id="ed-playhead"></div>
+        </div>
+
+        <div class="trim-times">
+          <span>Start: <span class="time-green" id="ed-trimStart">0:00.0</span></span>
+          <span>Selection: <span id="ed-trimDuration">0:00.0</span></span>
+          <span>End: <span class="time-red" id="ed-trimEnd">0:00.0</span></span>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="editor-toolbar">
+          <button id="ed-playBtn">Play selection</button>
+          <button id="ed-stopBtn">Stop</button>
+          <button id="ed-resetBtn">Reset trim</button>
+          <button id="ed-fadeToggle">Fade In/Out</button>
+        </div>
+
+        <!-- Fade controls -->
+        <div class="effect-controls" id="ed-fadeControls">
+          <div class="effect-row">
+            <label>Fade in:</label>
+            <input type="range" id="ed-fadeIn" min="0" max="10" step="0.1" value="0">
+            <span class="range-val" id="ed-fadeInVal">0.0s</span>
+          </div>
+          <div class="effect-row">
+            <label>Fade out:</label>
+            <input type="range" id="ed-fadeOut" min="0" max="10" step="0.1" value="0">
+            <span class="range-val" id="ed-fadeOutVal">0.0s</span>
+          </div>
+        </div>
+
+        <!-- Export -->
+        <button class="action-btn" id="ed-exportBtn">Export Edited MP3</button>
+
+        <div class="progress-wrap" id="ed-progressWrap">
+          <div class="progress-bar"><div class="fill" id="ed-progressFill"></div></div>
+          <p class="progress-text" id="ed-progressText">Starting...</p>
+        </div>
+
+        <div class="result" id="ed-result">
+          <a id="ed-downloadLink" href="#" download="edited.mp3">Download Edited MP3</a>
+          <p class="info" id="ed-resultInfo"></p>
+          <div class="preview">
+            <p class="preview-label">Preview:</p>
+            <audio id="ed-audioPreview" controls></audio>
+          </div>
         </div>
       </div>
     </div>
@@ -1260,6 +1507,444 @@
           processBtn.textContent = 'Create Set List MP3';
           setTimeout(() => progressWrap.classList.remove('active'), 1500);
         }
+      });
+    })();
+
+    /* ═══════════════════════════════════════════════
+       Tab 3: MP3 Editor
+       ═══════════════════════════════════════════════ */
+    (function editorTab() {
+      const uploadArea  = document.getElementById('ed-uploadArea');
+      const fileInput   = document.getElementById('ed-fileInput');
+      const fileNameEl  = document.getElementById('ed-fileName');
+      const errorBox    = document.getElementById('ed-errorBox');
+      const gdriveBtn   = document.getElementById('ed-gdriveBtn');
+      const gdriveNotice = document.getElementById('ed-gdriveNotice');
+      const workspace   = document.getElementById('ed-workspace');
+      const canvas      = document.getElementById('ed-canvas');
+      const ctx         = canvas.getContext('2d');
+      const waveformWrap = document.getElementById('ed-waveformWrap');
+      const overlayLeft  = document.getElementById('ed-overlayLeft');
+      const overlayRight = document.getElementById('ed-overlayRight');
+      const handleLeft   = document.getElementById('ed-handleLeft');
+      const handleRight  = document.getElementById('ed-handleRight');
+      const playhead     = document.getElementById('ed-playhead');
+      const trimStartEl  = document.getElementById('ed-trimStart');
+      const trimEndEl    = document.getElementById('ed-trimEnd');
+      const trimDurEl    = document.getElementById('ed-trimDuration');
+      const playBtn      = document.getElementById('ed-playBtn');
+      const stopBtn      = document.getElementById('ed-stopBtn');
+      const resetBtn     = document.getElementById('ed-resetBtn');
+      const fadeToggle   = document.getElementById('ed-fadeToggle');
+      const fadeControls = document.getElementById('ed-fadeControls');
+      const fadeInRange  = document.getElementById('ed-fadeIn');
+      const fadeOutRange = document.getElementById('ed-fadeOut');
+      const fadeInVal    = document.getElementById('ed-fadeInVal');
+      const fadeOutVal   = document.getElementById('ed-fadeOutVal');
+      const exportBtn    = document.getElementById('ed-exportBtn');
+      const progressWrap = document.getElementById('ed-progressWrap');
+      const progressFill = document.getElementById('ed-progressFill');
+      const progressTextEl = document.getElementById('ed-progressText');
+      const resultDiv    = document.getElementById('ed-result');
+      const dlLink       = document.getElementById('ed-downloadLink');
+      const resultInfo   = document.getElementById('ed-resultInfo');
+      const audioPreview = document.getElementById('ed-audioPreview');
+
+      let audioBuffer = null;
+      let sampleRate = 44100;
+      let duration = 0;
+      let fileName = '';
+
+      // Trim state: ratio 0..1 within the full track
+      let trimStartRatio = 0;
+      let trimEndRatio = 1;
+
+      // Playback state
+      let playCtx = null;
+      let playSource = null;
+      let playStartTime = 0;
+      let playStartOffset = 0;
+      let playAnimId = null;
+
+      function sp(pct, text) { setProgress(progressFill, progressTextEl, pct, text); }
+
+      showGdriveSetupNotice(gdriveNotice);
+
+      /* ── File upload ── */
+      uploadArea.addEventListener('click', () => fileInput.click());
+      uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+      uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+      uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+      });
+      fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+
+      gdriveBtn.addEventListener('click', async () => {
+        try {
+          gdriveBtn.disabled = true;
+          gdriveBtn.textContent = 'Opening Drive...';
+          const results = await openDrivePicker(false);
+          if (results.length > 0) {
+            const { name, blob } = results[0];
+            loadFile(new File([blob], name, { type: 'audio/mpeg' }));
+          }
+        } catch (err) {
+          showError(errorBox, 'Google Drive import failed: ' + err.message);
+        } finally {
+          gdriveBtn.disabled = false;
+          gdriveBtn.textContent = 'Import from Google Drive';
+        }
+      });
+
+      async function loadFile(file) {
+        if (!file.name.toLowerCase().endsWith('.mp3') && file.type !== 'audio/mpeg') {
+          showError(errorBox, 'Please select an MP3 file.');
+          return;
+        }
+        hideError(errorBox);
+        fileName = file.name;
+        fileNameEl.textContent = file.name + ' (' + formatSize(file.size) + ')';
+        uploadArea.classList.add('has-file');
+
+        try {
+          const arrayBuf = await file.arrayBuffer();
+          const actx = new (window.AudioContext || window.webkitAudioContext)();
+          audioBuffer = await actx.decodeAudioData(arrayBuf);
+          actx.close();
+
+          sampleRate = audioBuffer.sampleRate;
+          duration = audioBuffer.duration;
+
+          trimStartRatio = 0;
+          trimEndRatio = 1;
+
+          workspace.classList.add('active');
+          resultDiv.classList.remove('active');
+
+          drawWaveform();
+          updateTrimUI();
+        } catch (err) {
+          console.error(err);
+          showError(errorBox, 'Failed to decode audio: ' + err.message);
+        }
+      }
+
+      /* ── Waveform drawing ── */
+      function drawWaveform() {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+
+        const w = rect.width;
+        const h = rect.height;
+        const mid = h / 2;
+        const data = audioBuffer.getChannelData(0);
+        const step = Math.max(1, Math.floor(data.length / w));
+
+        ctx.clearRect(0, 0, w, h);
+
+        // Draw center line
+        ctx.strokeStyle = '#1a3a5c';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, mid);
+        ctx.lineTo(w, mid);
+        ctx.stroke();
+
+        // Draw waveform
+        ctx.fillStyle = '#e94560';
+        for (let x = 0; x < w; x++) {
+          const start = Math.floor(x * data.length / w);
+          let min = 0, max = 0;
+          for (let j = 0; j < step; j++) {
+            const val = data[start + j] || 0;
+            if (val < min) min = val;
+            if (val > max) max = val;
+          }
+          const top = mid + min * mid;
+          const bottom = mid + max * mid;
+          ctx.fillRect(x, top, 1, bottom - top || 1);
+        }
+
+        // Time markers at bottom
+        ctx.fillStyle = '#555';
+        ctx.font = '10px sans-serif';
+        const numMarkers = Math.min(10, Math.floor(duration));
+        if (numMarkers > 0) {
+          const interval = duration / numMarkers;
+          for (let i = 0; i <= numMarkers; i++) {
+            const t = i * interval;
+            const x = (t / duration) * w;
+            ctx.fillRect(x, h - 12, 1, 4);
+            ctx.fillText(fmtTime(t), x + 2, h - 2);
+          }
+        }
+      }
+
+      /* ── Time formatting ── */
+      function fmtTime(sec) {
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return m + ':' + s.toFixed(1).padStart(4, '0');
+      }
+
+      /* ── Trim handle dragging ── */
+      function updateTrimUI() {
+        const w = waveformWrap.getBoundingClientRect().width;
+
+        overlayLeft.style.width = (trimStartRatio * 100) + '%';
+        overlayRight.style.width = ((1 - trimEndRatio) * 100) + '%';
+
+        handleLeft.style.left = (trimStartRatio * 100) + '%';
+        handleRight.style.left = (trimEndRatio * 100) + '%';
+
+        const startSec = trimStartRatio * duration;
+        const endSec = trimEndRatio * duration;
+        trimStartEl.textContent = fmtTime(startSec);
+        trimEndEl.textContent = fmtTime(endSec);
+        trimDurEl.textContent = fmtTime(endSec - startSec);
+      }
+
+      function startDrag(handle, isLeft) {
+        const onMove = (e) => {
+          e.preventDefault();
+          const rect = waveformWrap.getBoundingClientRect();
+          const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+          let ratio = (clientX - rect.left) / rect.width;
+          ratio = Math.max(0, Math.min(1, ratio));
+
+          if (isLeft) {
+            trimStartRatio = Math.min(ratio, trimEndRatio - 0.005);
+          } else {
+            trimEndRatio = Math.max(ratio, trimStartRatio + 0.005);
+          }
+          updateTrimUI();
+        };
+
+        const onUp = () => {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          document.removeEventListener('touchmove', onMove);
+          document.removeEventListener('touchend', onUp);
+        };
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+        document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('touchend', onUp);
+      }
+
+      handleLeft.addEventListener('mousedown', (e) => { e.preventDefault(); startDrag(handleLeft, true); });
+      handleLeft.addEventListener('touchstart', (e) => { e.preventDefault(); startDrag(handleLeft, true); }, { passive: false });
+      handleRight.addEventListener('mousedown', (e) => { e.preventDefault(); startDrag(handleRight, false); });
+      handleRight.addEventListener('touchstart', (e) => { e.preventDefault(); startDrag(handleRight, false); }, { passive: false });
+
+      // Click on waveform to set playhead position
+      canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const ratio = (e.clientX - rect.left) / rect.width;
+        // If clicked outside trim range, move nearest handle
+        if (ratio < trimStartRatio) {
+          trimStartRatio = Math.max(0, ratio);
+          updateTrimUI();
+        } else if (ratio > trimEndRatio) {
+          trimEndRatio = Math.min(1, ratio);
+          updateTrimUI();
+        }
+      });
+
+      /* ── Reset trim ── */
+      resetBtn.addEventListener('click', () => {
+        trimStartRatio = 0;
+        trimEndRatio = 1;
+        updateTrimUI();
+      });
+
+      /* ── Fade toggle ── */
+      fadeToggle.addEventListener('click', () => {
+        fadeToggle.classList.toggle('active-effect');
+        fadeControls.classList.toggle('active');
+      });
+
+      fadeInRange.addEventListener('input', () => {
+        fadeInVal.textContent = parseFloat(fadeInRange.value).toFixed(1) + 's';
+      });
+      fadeOutRange.addEventListener('input', () => {
+        fadeOutVal.textContent = parseFloat(fadeOutRange.value).toFixed(1) + 's';
+      });
+
+      /* ── Playback ── */
+      function stopPlayback() {
+        if (playSource) {
+          try { playSource.stop(); } catch (_) {}
+          playSource = null;
+        }
+        if (playCtx) {
+          playCtx.close();
+          playCtx = null;
+        }
+        if (playAnimId) {
+          cancelAnimationFrame(playAnimId);
+          playAnimId = null;
+        }
+        playhead.classList.remove('active');
+      }
+
+      playBtn.addEventListener('click', () => {
+        if (!audioBuffer) return;
+        stopPlayback();
+
+        playCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        const startSample = Math.floor(trimStartRatio * audioBuffer.length);
+        const endSample = Math.floor(trimEndRatio * audioBuffer.length);
+        const len = endSample - startSample;
+        if (len <= 0) return;
+
+        // Create a buffer with just the trimmed region (with fades applied for preview)
+        const numCh = audioBuffer.numberOfChannels;
+        const previewBuf = playCtx.createBuffer(numCh, len, audioBuffer.sampleRate);
+
+        const fadeInSec = parseFloat(fadeInRange.value) || 0;
+        const fadeOutSec = parseFloat(fadeOutRange.value) || 0;
+        const fadeInSamples = Math.floor(fadeInSec * audioBuffer.sampleRate);
+        const fadeOutSamples = Math.floor(fadeOutSec * audioBuffer.sampleRate);
+
+        for (let ch = 0; ch < numCh; ch++) {
+          const src = audioBuffer.getChannelData(ch);
+          const dst = previewBuf.getChannelData(ch);
+          for (let i = 0; i < len; i++) {
+            let sample = src[startSample + i];
+            // Fade in
+            if (i < fadeInSamples) {
+              sample *= i / fadeInSamples;
+            }
+            // Fade out
+            if (i >= len - fadeOutSamples) {
+              sample *= (len - i) / fadeOutSamples;
+            }
+            dst[i] = sample;
+          }
+        }
+
+        playSource = playCtx.createBufferSource();
+        playSource.buffer = previewBuf;
+        playSource.connect(playCtx.destination);
+        playSource.start();
+
+        playStartTime = playCtx.currentTime;
+        playStartOffset = trimStartRatio;
+        const selectionDuration = (trimEndRatio - trimStartRatio) * duration;
+
+        playhead.classList.add('active');
+
+        function animatePlayhead() {
+          if (!playCtx) return;
+          const elapsed = playCtx.currentTime - playStartTime;
+          if (elapsed >= selectionDuration) {
+            stopPlayback();
+            return;
+          }
+          const ratio = playStartOffset + (elapsed / duration);
+          playhead.style.left = (ratio * 100) + '%';
+          playAnimId = requestAnimationFrame(animatePlayhead);
+        }
+        animatePlayhead();
+
+        playSource.onended = () => stopPlayback();
+      });
+
+      stopBtn.addEventListener('click', stopPlayback);
+
+      /* ── Export ── */
+      exportBtn.addEventListener('click', async () => {
+        if (!audioBuffer) return;
+
+        hideError(errorBox);
+        exportBtn.disabled = true;
+        exportBtn.textContent = 'Exporting...';
+        resultDiv.classList.remove('active');
+        progressWrap.classList.add('active');
+        sp(5, 'Preparing audio...');
+
+        try {
+          const startSample = Math.floor(trimStartRatio * audioBuffer.length);
+          const endSample = Math.floor(trimEndRatio * audioBuffer.length);
+          const len = endSample - startSample;
+          const numCh = audioBuffer.numberOfChannels;
+
+          const fadeInSec = parseFloat(fadeInRange.value) || 0;
+          const fadeOutSec = parseFloat(fadeOutRange.value) || 0;
+          const fadeInSamples = Math.floor(fadeInSec * sampleRate);
+          const fadeOutSamples = Math.floor(fadeOutSec * sampleRate);
+
+          sp(15, 'Applying effects...');
+
+          const channels = [];
+          for (let ch = 0; ch < numCh; ch++) {
+            const src = audioBuffer.getChannelData(ch);
+            const dst = new Float32Array(len);
+            for (let i = 0; i < len; i++) {
+              let sample = src[startSample + i];
+              if (i < fadeInSamples) {
+                sample *= i / fadeInSamples;
+              }
+              if (i >= len - fadeOutSamples) {
+                sample *= (len - i) / fadeOutSamples;
+              }
+              dst[i] = sample;
+            }
+            channels.push(dst);
+          }
+
+          sp(30, 'Encoding to MP3...');
+
+          const mp3Data = await encodeMP3(channels, sampleRate, numCh, len, (ratio) => {
+            sp(30 + Math.floor(ratio * 65), 'Encoding to MP3... ' + Math.floor(ratio * 100) + '%');
+          });
+
+          sp(96, 'Finalizing...');
+
+          const blob = new Blob(mp3Data, { type: 'audio/mpeg' });
+          const url = URL.createObjectURL(blob);
+          const baseName = fileName.replace(/\.mp3$/i, '');
+          const outName = baseName + '_edited.mp3';
+
+          dlLink.href = url;
+          dlLink.download = outName;
+          audioPreview.src = url;
+
+          const durationSec = len / sampleRate;
+          const mins = Math.floor(durationSec / 60);
+          const secs = Math.floor(durationSec % 60);
+          resultInfo.textContent = outName + ' \u2014 ' + formatSize(blob.size) + ' \u2014 ' + mins + 'm ' + secs + 's';
+
+          sp(100, 'Done!');
+          resultDiv.classList.add('active');
+        } catch (err) {
+          console.error(err);
+          showError(errorBox, 'Export failed: ' + err.message);
+        } finally {
+          exportBtn.disabled = false;
+          exportBtn.textContent = 'Export Edited MP3';
+          setTimeout(() => progressWrap.classList.remove('active'), 1500);
+        }
+      });
+
+      /* ── Redraw on resize ── */
+      let resizeTimer;
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          if (audioBuffer) {
+            drawWaveform();
+            updateTrimUI();
+          }
+        }, 150);
       });
     })();
   </script>
