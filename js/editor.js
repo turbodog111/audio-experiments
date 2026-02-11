@@ -41,6 +41,9 @@
   var resultDiv       = document.getElementById('ed-result');
   var dlLink          = document.getElementById('ed-downloadLink');
   var resultInfo      = document.getElementById('ed-resultInfo');
+  var analysisBadges  = document.getElementById('ed-analysisBadges');
+  var bpmBadge        = document.getElementById('ed-bpmBadge');
+  var keyBadge        = document.getElementById('ed-keyBadge');
   var audioPreview    = document.getElementById('ed-audioPreview');
 
   /* ── Effects DOM references ── */
@@ -1753,6 +1756,13 @@
 
       var renderedBuffer = await offCtx.startRendering();
 
+      // Analyze BPM & Key
+      sp(50, 'Analyzing BPM & key...');
+      var analysis = null;
+      try {
+        analysis = analyzeAudio(renderedBuffer);
+      } catch (_) { /* analysis is optional */ }
+
       sp(60, 'Encoding to MP3...');
 
       var outLeft = renderedBuffer.getChannelData(0);
@@ -1802,6 +1812,15 @@
       resultInfo.textContent = outName + ' \u2014 ' + formatSize(blob.size) +
         ' \u2014 ' + mins + 'm ' + secs + 's' +
         ' \u2014 ' + assigned.length + ' track' + (assigned.length !== 1 ? 's' : '');
+
+      // Show analysis results
+      if (analysis && analysis.bpm) {
+        bpmBadge.textContent = 'BPM: ' + analysis.bpm;
+        keyBadge.textContent = 'Key: ' + analysis.keyFull;
+        analysisBadges.style.display = 'flex';
+      } else {
+        analysisBadges.style.display = 'none';
+      }
 
       sp(100, 'Done!');
       resultDiv.classList.add('active');

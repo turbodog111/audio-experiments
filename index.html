@@ -26,6 +26,7 @@
       <button class="tab-btn" data-tab="setlist">Set List Creator</button>
       <button class="tab-btn" data-tab="editor">MP3 Editor</button>
       <button class="tab-btn" data-tab="converter">MP3 / WAV Converter</button>
+      <button class="tab-btn" data-tab="musicgen">AI Music Generator</button>
     </div>
 
     <!-- ════════════════════════════════════════════ -->
@@ -286,6 +287,10 @@
             <div class="result" id="ed-result">
               <a id="ed-downloadLink" href="#" download="edited.mp3">Download Edited MP3</a>
               <p class="info" id="ed-resultInfo"></p>
+              <div class="analysis-badges" id="ed-analysisBadges" style="display:none;">
+                <span class="analysis-badge bpm-badge" id="ed-bpmBadge"></span>
+                <span class="analysis-badge key-badge" id="ed-keyBadge"></span>
+              </div>
               <div class="preview">
                 <p class="preview-label">Preview:</p>
                 <audio id="ed-audioPreview" controls></audio>
@@ -385,6 +390,64 @@
         </div>
       </div>
     </div>
+    <!-- ════════════════════════════════════════════ -->
+    <!-- Tab 5: AI Music Generator                   -->
+    <!-- ════════════════════════════════════════════ -->
+    <div class="tab-panel" id="tab-musicgen">
+      <h2>AI Music Generator</h2>
+      <p class="subtitle">Describe the music you want and let Meta's MusicGen AI create it for you.</p>
+
+      <div class="musicgen-form">
+        <label class="musicgen-label" for="mg-prompt">Music Description</label>
+        <textarea id="mg-prompt" class="musicgen-prompt" rows="3"
+          placeholder="e.g. Upbeat electronic dance music with heavy bass and bright synths"></textarea>
+
+        <div class="musicgen-controls">
+          <div class="musicgen-control-group">
+            <label for="mg-model">Model:</label>
+            <select id="mg-model" class="musicgen-select">
+              <option value="stereo-medium" selected>Stereo Medium (recommended)</option>
+              <option value="stereo-melody">Stereo Melody</option>
+              <option value="stereo-large">Stereo Large (slower)</option>
+              <option value="medium">Mono Medium</option>
+              <option value="melody">Mono Melody</option>
+              <option value="large">Mono Large (slower)</option>
+              <option value="small">Small (fastest)</option>
+            </select>
+          </div>
+          <div class="musicgen-control-group">
+            <label for="mg-duration">Duration:</label>
+            <input type="range" id="mg-duration" min="5" max="30" step="5" value="10">
+            <span class="range-val" id="mg-durationVal">10s</span>
+          </div>
+        </div>
+      </div>
+
+      <button class="action-btn musicgen-btn" id="mg-generateBtn" disabled>Loading AI service...</button>
+
+      <div class="separator-status" id="mg-status" style="display:none;">
+        <div class="separator-status-icon" id="mg-statusIcon"></div>
+        <span id="mg-statusText">Connecting to AI service...</span>
+      </div>
+
+      <div class="progress-wrap" id="mg-progressWrap">
+        <div class="progress-bar"><div class="fill" id="mg-progressFill"></div></div>
+        <p class="progress-text" id="mg-progressText"></p>
+      </div>
+
+      <div class="error" id="mg-errorBox"></div>
+
+      <div class="result" id="mg-result">
+        <a id="mg-downloadLink" href="#" download="musicgen_output.wav">Download Generated Music</a>
+        <p class="info" id="mg-resultInfo"></p>
+        <div class="preview">
+          <p class="preview-label">Preview:</p>
+          <audio id="mg-audioPreview" controls></audio>
+        </div>
+      </div>
+
+      <p class="musicgen-attribution">Powered by <a href="https://github.com/facebookresearch/audiocraft" target="_blank" rel="noopener">Meta MusicGen</a> via <a href="https://huggingface.co/spaces/Surn/UnlimitedMusicGen" target="_blank" rel="noopener">Hugging Face</a></p>
+    </div>
   </div>
 
   <!-- Help Guide Button -->
@@ -440,6 +503,17 @@
           <li>Preview the result and click the download link to save.</li>
         </ol>
       </div>
+      <div class="guide-section" id="guide-musicgen">
+        <h4>AI Music Generator</h4>
+        <ol>
+          <li>Enter a <strong>music description</strong> in the text box (e.g. &ldquo;upbeat jazz with piano and drums&rdquo;).</li>
+          <li>Choose a <strong>model</strong> &mdash; &ldquo;Stereo Medium&rdquo; is recommended for balanced quality and speed.</li>
+          <li>Set the <strong>duration</strong> (5&ndash;30 seconds).</li>
+          <li>Click <strong>&ldquo;Generate Music&rdquo;</strong> and wait 30&ndash;120 seconds for the AI to compose.</li>
+          <li>Preview the result and click the download link to save.</li>
+        </ol>
+        <p style="font-size:0.78rem; color:var(--text-dimmed); margin-top:8px;">Note: The AI service runs on a shared GPU and may take time to wake up on first use.</p>
+      </div>
       <div class="guide-section" id="guide-shortcuts">
         <h4>Keyboard Shortcuts</h4>
         <ul class="guide-shortcuts-list">
@@ -455,7 +529,7 @@
   <!-- Footer -->
   <footer class="footer">
     <p>MP3 Master Editor &mdash; Browser-based audio tools. Your files stay local.</p>
-    <p style="margin-top: 4px;">Vocal separation powered by <a href="https://huggingface.co/spaces/abidlabs/music-separation" target="_blank" rel="noopener">Hugging Face</a></p>
+    <p style="margin-top: 4px;">AI features powered by <a href="https://huggingface.co/" target="_blank" rel="noopener">Hugging Face</a></p>
   </footer>
 
   <!-- Scripts: ORDER MATTERS -->
@@ -463,9 +537,11 @@
   <script src="js/tabs.js"></script>
   <script src="js/repeater.js"></script>
   <script src="js/setlist.js"></script>
+  <script src="js/analyzer.js"></script>
   <script src="js/editor.js"></script>
   <script src="js/converter.js"></script>
   <script src="js/separator.js"></script>
+  <script src="js/musicgen.js"></script>
   <script src="js/guide.js"></script>
 
   <!-- Gradio client (ES module) bridged to global scope -->
