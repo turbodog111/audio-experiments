@@ -16,6 +16,7 @@
   var libraryList     = document.getElementById('ed-libraryList');
   var libraryFooter   = document.getElementById('ed-libraryFooter');
   var waveformContainer = document.getElementById('ed-waveformContainer');
+  var waveformInner   = document.getElementById('ed-waveformInner');
   var waveformLanes   = document.getElementById('ed-waveformLanes');
   var fxTargetPills   = document.getElementById('ed-fxTargetPills');
   var overlayLeft     = document.getElementById('ed-overlayLeft');
@@ -115,6 +116,9 @@
   var playStartRatio = 0;
   var playAnimId = null;
 
+  /* ── Zoom state ── */
+  var pixelsPerSecond = 100;
+
   /* ── Drag state ── */
   var draggedFileId = null;
 
@@ -166,6 +170,10 @@
       if (trackSlots[i].assignedFileId !== null) out.push(trackSlots[i]);
     }
     return out;
+  }
+
+  function getTimelineWidth() {
+    return Math.max(waveformContainer.clientWidth || 600, totalDuration * pixelsPerSecond);
   }
 
   function effectiveDuration(slot) {
@@ -1130,6 +1138,12 @@
 
       initTrackBlockDrag(overlay, leftHandle, rightHandle, assigned[i], lane);
     }
+
+    // Set timeline width for zoom/scroll
+    var timelineW = getTimelineWidth();
+    waveformInner.style.width = timelineW + 'px';
+    waveformLanes.style.width = timelineW + 'px';
+
     updateAllOverlays();
   }
 
@@ -1139,19 +1153,15 @@
       var ov = assigned[i]._overlay;
       if (!ov) continue;
       var effDur = effectiveDuration(assigned[i]);
-      var leftPct = totalDuration > 0 ? (assigned[i].startOffset / totalDuration) * 100 : 0;
-      var widthPct = totalDuration > 0 ? (effDur / totalDuration) * 100 : 100;
-      ov.style.left = leftPct + '%';
-      ov.style.width = widthPct + '%';
+      ov.style.left = (assigned[i].startOffset * pixelsPerSecond) + 'px';
+      ov.style.width = (effDur * pixelsPerSecond) + 'px';
 
       // Position silence region overlays
       for (var sr = 0; sr < assigned[i].silenceRegions.length; sr++) {
         var region = assigned[i].silenceRegions[sr];
         if (!region._overlay) continue;
-        var rLeft = totalDuration > 0 ? (region.start / totalDuration) * 100 : 0;
-        var rWidth = totalDuration > 0 ? ((region.end - region.start) / totalDuration) * 100 : 0;
-        region._overlay.style.left = rLeft + '%';
-        region._overlay.style.width = rWidth + '%';
+        region._overlay.style.left = (region.start * pixelsPerSecond) + 'px';
+        region._overlay.style.width = ((region.end - region.start) * pixelsPerSecond) + 'px';
       }
     }
   }
@@ -1161,21 +1171,22 @@
     overlay.addEventListener('mousedown', function(e) {
       if (e.target === leftHandle || e.target === rightHandle) return;
       e.preventDefault();
-      var rect = lane.getBoundingClientRect();
       var startX = e.clientX;
       var origOffset = slot.startOffset;
-      var origDuration = totalDuration || 1;
       overlay.classList.add('dragging');
 
       var onMove = function(ev) {
         ev.preventDefault();
         var dx = ev.clientX - startX;
-        var dtSec = (dx / rect.width) * origDuration;
+        var dtSec = dx / pixelsPerSecond;
         var newOffset = origOffset + dtSec;
         // Snap to 0.01s unless Shift held
         if (!ev.shiftKey) newOffset = Math.round(newOffset * 100) / 100;
         slot.startOffset = Math.max(0, newOffset);
         recalcDuration();
+        var tw = getTimelineWidth() + 'px';
+        waveformInner.style.width = tw;
+        waveformLanes.style.width = tw;
         updateAllOverlays();
         drawAllWaveforms();
       };
@@ -1193,20 +1204,21 @@
     rightHandle.addEventListener('mousedown', function(e) {
       e.preventDefault();
       e.stopPropagation();
-      var rect = lane.getBoundingClientRect();
       var lf = getLibFile(slot.assignedFileId);
       if (!lf) return;
-      var origDuration = totalDuration || 1;
 
       var onMove = function(ev) {
         ev.preventDefault();
-        var xRatio = (ev.clientX - rect.left) / rect.width;
-        var timelineSec = xRatio * origDuration;
+        var rect = lane.getBoundingClientRect();
+        var timelineSec = (ev.clientX - rect.left) / pixelsPerSecond;
         var newClipEnd = timelineSec - slot.startOffset + (slot.clipStart || 0);
         if (!ev.shiftKey) newClipEnd = Math.round(newClipEnd * 100) / 100;
         newClipEnd = Math.max((slot.clipStart || 0) + 0.1, Math.min(newClipEnd, lf.buffer.duration));
         slot.clipEnd = newClipEnd;
         recalcDuration();
+        var tw = getTimelineWidth() + 'px';
+        waveformInner.style.width = tw;
+        waveformLanes.style.width = tw;
         updateAllOverlays();
         drawAllWaveforms();
       };
@@ -1223,24 +1235,25 @@
     leftHandle.addEventListener('mousedown', function(e) {
       e.preventDefault();
       e.stopPropagation();
-      var rect = lane.getBoundingClientRect();
       var lf = getLibFile(slot.assignedFileId);
       if (!lf) return;
       var origStartOffset = slot.startOffset;
       var origClipStart = slot.clipStart || 0;
-      var origDuration = totalDuration || 1;
       var rightEdgeTime = origStartOffset + effectiveDuration(slot);
 
       var onMove = function(ev) {
         ev.preventDefault();
-        var xRatio = (ev.clientX - rect.left) / rect.width;
-        var timelineSec = xRatio * origDuration;
+        var rect = lane.getBoundingClientRect();
+        var timelineSec = (ev.clientX - rect.left) / pixelsPerSecond;
         if (!ev.shiftKey) timelineSec = Math.round(timelineSec * 100) / 100;
         timelineSec = Math.max(0, Math.min(timelineSec, rightEdgeTime - 0.1));
         var delta = timelineSec - origStartOffset;
         slot.startOffset = timelineSec;
         slot.clipStart = Math.max(0, Math.min(origClipStart + delta, lf.buffer.duration - 0.1));
         recalcDuration();
+        var tw = getTimelineWidth() + 'px';
+        waveformInner.style.width = tw;
+        waveformLanes.style.width = tw;
         updateAllOverlays();
         drawAllWaveforms();
       };
@@ -1267,17 +1280,15 @@
       if (e.target === leftHandle || e.target === rightHandle || e.target === deleteBtn) return;
       e.preventDefault();
       e.stopPropagation();
-      var rect = lane.getBoundingClientRect();
       var startX = e.clientX;
       var origStart = region.start;
       var origEnd = region.end;
       var w = origEnd - origStart;
-      var dur = totalDuration || 1;
 
       var onMove = function(ev) {
         ev.preventDefault();
         var dx = ev.clientX - startX;
-        var dt = (dx / rect.width) * dur;
+        var dt = dx / pixelsPerSecond;
         var ns = origStart + dt;
         if (!ev.shiftKey) ns = Math.round(ns * 100) / 100;
         ns = Math.max(0, Math.min(ns, (totalDuration || 1) - w));
@@ -1297,13 +1308,11 @@
     leftHandle.addEventListener('mousedown', function(e) {
       e.preventDefault();
       e.stopPropagation();
-      var rect = lane.getBoundingClientRect();
-      var dur = totalDuration || 1;
 
       var onMove = function(ev) {
         ev.preventDefault();
-        var xr = (ev.clientX - rect.left) / rect.width;
-        var ts = xr * dur;
+        var rect = lane.getBoundingClientRect();
+        var ts = (ev.clientX - rect.left) / pixelsPerSecond;
         if (!ev.shiftKey) ts = Math.round(ts * 100) / 100;
         region.start = Math.max(0, Math.min(ts, region.end - MIN_W));
         updateAllOverlays();
@@ -1321,13 +1330,11 @@
     rightHandle.addEventListener('mousedown', function(e) {
       e.preventDefault();
       e.stopPropagation();
-      var rect = lane.getBoundingClientRect();
-      var dur = totalDuration || 1;
 
       var onMove = function(ev) {
         ev.preventDefault();
-        var xr = (ev.clientX - rect.left) / rect.width;
-        var ts = xr * dur;
+        var rect = lane.getBoundingClientRect();
+        var ts = (ev.clientX - rect.left) / pixelsPerSecond;
         if (!ev.shiftKey) ts = Math.round(ts * 100) / 100;
         region.end = Math.max(region.start + MIN_W, Math.min(ts, totalDuration || 1));
         updateAllOverlays();
@@ -1374,8 +1381,8 @@
     var startOffset = slot ? (slot.startOffset || 0) : 0;
     var clipDuration = Math.max(0, clipEnd - clipStart);
 
-    var startPx = totalDuration > 0 ? (startOffset / totalDuration) * w : 0;
-    var trackWidthPx = totalDuration > 0 ? (clipDuration / totalDuration) * w : w;
+    var startPx = startOffset * pixelsPerSecond;
+    var trackWidthPx = clipDuration * pixelsPerSecond;
 
     var clipStartSample = Math.floor(clipStart * sampleRate);
     var clipEndSample = Math.floor(clipEnd * sampleRate);
@@ -1407,15 +1414,18 @@
       ctx.fillRect(startPx + x, top, 1, bottom - top || 1);
     }
 
-    // Time markers (only on first lane)
+    // Time markers
     ctx.fillStyle = '#4a4a5e';
     ctx.font = '10px Inter, sans-serif';
-    var numMarkers = Math.min(10, Math.floor(totalDuration));
-    if (numMarkers > 0) {
-      var interval = totalDuration / numMarkers;
-      for (var m = 0; m <= numMarkers; m++) {
-        var t = m * interval;
-        var xm = (t / totalDuration) * w;
+    if (totalDuration > 0) {
+      // Choose a nice interval based on zoom level
+      var secPerMarker = 1;
+      if (pixelsPerSecond < 30) secPerMarker = 10;
+      else if (pixelsPerSecond < 60) secPerMarker = 5;
+      else if (pixelsPerSecond < 150) secPerMarker = 2;
+      else if (pixelsPerSecond > 300) secPerMarker = 0.5;
+      for (var t = 0; t <= totalDuration; t += secPerMarker) {
+        var xm = t * pixelsPerSecond;
         ctx.fillRect(xm, h - 12, 1, 4);
         ctx.fillText(fmtTime(t), xm + 2, h - 2);
       }
@@ -1427,10 +1437,12 @@
      ═══════════════════════════════════════════════ */
 
   function updateTrimUI() {
-    overlayLeft.style.width = (trimStartRatio * 100) + '%';
-    overlayRight.style.width = ((1 - trimEndRatio) * 100) + '%';
-    handleLeft.style.left = (trimStartRatio * 100) + '%';
-    handleRight.style.left = (trimEndRatio * 100) + '%';
+    var timelineW = getTimelineWidth();
+    overlayLeft.style.width = (trimStartRatio * timelineW) + 'px';
+    overlayRight.style.left = (trimEndRatio * timelineW) + 'px';
+    overlayRight.style.width = ((1 - trimEndRatio) * timelineW) + 'px';
+    handleLeft.style.left = (trimStartRatio * timelineW) + 'px';
+    handleRight.style.left = (trimEndRatio * timelineW) + 'px';
 
     var startSec = trimStartRatio * totalDuration;
     var endSec = trimEndRatio * totalDuration;
@@ -1444,7 +1456,9 @@
       e.preventDefault();
       var rect = waveformContainer.getBoundingClientRect();
       var clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      var ratio = (clientX - rect.left) / rect.width;
+      var timelineW = getTimelineWidth();
+      var posInContent = clientX - rect.left + waveformContainer.scrollLeft;
+      var ratio = posInContent / timelineW;
       ratio = Math.max(0, Math.min(1, ratio));
 
       if (isLeft) {
@@ -1484,7 +1498,8 @@
      ═══════════════════════════════════════════════ */
 
   function updatePlayheadUI() {
-    playheadEl.style.left = (playheadRatio * 100) + '%';
+    var timelineW = getTimelineWidth();
+    playheadEl.style.left = (playheadRatio * timelineW) + 'px';
   }
 
   function seekTo(ratio) {
@@ -1499,7 +1514,9 @@
   waveformContainer.addEventListener('click', function(e) {
     if (getAssignedSlots().length === 0) return;
     var rect = waveformContainer.getBoundingClientRect();
-    var ratio = (e.clientX - rect.left) / rect.width;
+    var timelineW = getTimelineWidth();
+    var posInContent = e.clientX - rect.left + waveformContainer.scrollLeft;
+    var ratio = posInContent / timelineW;
     seekTo(ratio);
   });
 
@@ -1511,7 +1528,9 @@
       ev.preventDefault();
       var rect = waveformContainer.getBoundingClientRect();
       var clientX = ev.touches ? ev.touches[0].clientX : ev.clientX;
-      var ratio = (clientX - rect.left) / rect.width;
+      var timelineW = getTimelineWidth();
+      var posInContent = clientX - rect.left + waveformContainer.scrollLeft;
+      var ratio = posInContent / timelineW;
       playheadRatio = Math.max(0, Math.min(1, ratio));
       updatePlayheadUI();
     };
@@ -1914,6 +1933,16 @@
 
       playheadRatio = currentRatio;
       updatePlayheadUI();
+
+      // Auto-scroll to keep playhead visible
+      var timelineW = getTimelineWidth();
+      var playheadPx = playheadRatio * timelineW;
+      var containerW = waveformContainer.clientWidth;
+      var scrollLeft = waveformContainer.scrollLeft;
+      if (playheadPx < scrollLeft || playheadPx > scrollLeft + containerW - 20) {
+        waveformContainer.scrollLeft = playheadPx - containerW * 0.25;
+      }
+
       playAnimId = requestAnimationFrame(animatePlayhead);
     }
     animatePlayhead();
@@ -2164,14 +2193,59 @@
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function() {
       if (getAssignedSlots().length > 0) {
-        drawAllWaveforms();
-        updateAllOverlays();
-        updateTrimUI();
-        updatePlayheadUI();
+        applyZoom();
       }
       // Redraw mini canvases
       rebuildTracksUI();
     }, 150);
+  });
+
+  /* ═══════════════════════════════════════════════
+     Zoom controls
+     ═══════════════════════════════════════════════ */
+
+  var zoomRange  = document.getElementById('ed-zoomRange');
+  var zoomVal    = document.getElementById('ed-zoomVal');
+  var zoomInBtn  = document.getElementById('ed-zoomIn');
+  var zoomOutBtn = document.getElementById('ed-zoomOut');
+
+  function applyZoom() {
+    var timelineW = getTimelineWidth();
+    waveformInner.style.width = timelineW + 'px';
+    waveformLanes.style.width = timelineW + 'px';
+    drawAllWaveforms();
+    updateAllOverlays();
+    updateTrimUI();
+    updatePlayheadUI();
+  }
+
+  function setZoom(val) {
+    // Keep center of viewport at same time position
+    var containerW = waveformContainer.clientWidth;
+    var oldScrollLeft = waveformContainer.scrollLeft;
+    var centerTimeSec = (oldScrollLeft + containerW / 2) / pixelsPerSecond;
+
+    pixelsPerSecond = Math.max(10, Math.min(800, val));
+    zoomRange.value = pixelsPerSecond;
+    zoomVal.textContent = pixelsPerSecond + ' px/s';
+
+    applyZoom();
+
+    // Restore center position
+    var newCenterPx = centerTimeSec * pixelsPerSecond;
+    waveformContainer.scrollLeft = newCenterPx - containerW / 2;
+  }
+
+  zoomRange.addEventListener('input', function() {
+    setZoom(parseInt(zoomRange.value));
+  });
+
+  zoomInBtn.addEventListener('click', function() {
+    setZoom(pixelsPerSecond + 20);
+  });
+
+  zoomOutBtn.addEventListener('click', function() {
+    setZoom(pixelsPerSecond - 20);
   });
 
   /* ── Initial state ── */

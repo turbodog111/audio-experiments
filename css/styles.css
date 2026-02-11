@@ -969,8 +969,25 @@ body.drag-in-progress .track-drop-zone .drop-zone-text {
   -webkit-user-select: none;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-medium) transparent;
+}
+
+.waveform-container::-webkit-scrollbar { height: 6px; }
+.waveform-container::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 3px;
+}
+.waveform-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.waveform-inner {
+  position: relative;
+  min-width: 100%;
 }
 
 .waveform-lane {
@@ -1001,7 +1018,7 @@ body.drag-in-progress .track-drop-zone .drop-zone-text {
 }
 
 .trim-overlay-left { left: 0; }
-.trim-overlay-right { right: 0; }
+.trim-overlay-right { /* positioned via JS using left */ }
 
 /* Trim handles */
 .trim-handle {
@@ -1082,6 +1099,56 @@ body.drag-in-progress .track-drop-zone .drop-zone-text {
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
   border-top: 8px solid #fff;
+}
+
+/* Zoom bar */
+.zoom-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.zoom-bar button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  transition: all var(--transition-fast);
+  line-height: 1;
+}
+
+.zoom-bar button:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  background: var(--accent-blue-glow);
+}
+
+.zoom-bar input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent-blue);
+}
+
+.zoom-bar span {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--accent-green);
+  min-width: 60px;
+  text-align: right;
 }
 
 /* Trim times */

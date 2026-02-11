@@ -134,12 +134,21 @@
           <!-- Global timeline waveform -->
           <div class="editor-workspace" id="ed-workspace">
             <div class="waveform-container" id="ed-waveformContainer">
-              <div class="waveform-lanes" id="ed-waveformLanes"></div>
-              <div class="trim-overlay-left" id="ed-overlayLeft"></div>
-              <div class="trim-overlay-right" id="ed-overlayRight"></div>
-              <div class="trim-handle trim-handle-left" id="ed-handleLeft"></div>
-              <div class="trim-handle trim-handle-right" id="ed-handleRight"></div>
-              <div class="playhead" id="ed-playhead"></div>
+              <div class="waveform-inner" id="ed-waveformInner">
+                <div class="waveform-lanes" id="ed-waveformLanes"></div>
+                <div class="trim-overlay-left" id="ed-overlayLeft"></div>
+                <div class="trim-overlay-right" id="ed-overlayRight"></div>
+                <div class="trim-handle trim-handle-left" id="ed-handleLeft"></div>
+                <div class="trim-handle trim-handle-right" id="ed-handleRight"></div>
+                <div class="playhead" id="ed-playhead"></div>
+              </div>
+            </div>
+
+            <div class="zoom-bar">
+              <button id="ed-zoomOut" title="Zoom out">&minus;</button>
+              <input type="range" id="ed-zoomRange" min="10" max="800" value="100">
+              <button id="ed-zoomIn" title="Zoom in">+</button>
+              <span id="ed-zoomVal">100 px/s</span>
             </div>
 
             <div class="trim-times">
@@ -495,6 +504,7 @@
           <li>Adjust <strong>Volume</strong> (0&ndash;150%) and <strong>Pan</strong> (L/R) per track.</li>
           <li><strong>Drag track blocks</strong> on the timeline to set their start position. Hold <kbd>Shift</kbd> for fine positioning.</li>
           <li><strong>Drag the left/right edges</strong> of track blocks to trim audio individually.</li>
+          <li>Use the <strong>zoom slider</strong> below the waveform to zoom in/out for precise editing. The timeline scrolls horizontally when zoomed in.</li>
           <li>Use the green (start) and red (end) <strong>trim handles</strong> for global selection bounds.</li>
           <li>Toggle effects: <strong>EQ</strong>, <strong>Compressor</strong>, <strong>Reverb</strong>, <strong>Delay</strong>, <strong>Distortion</strong>.</li>
           <li>Select a target (<strong>Master</strong> or individual track) above the effect panels to apply effects per-track or globally.</li>
