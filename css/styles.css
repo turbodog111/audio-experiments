@@ -1007,6 +1007,25 @@ body.drag-in-progress .track-drop-zone .drop-zone-text {
   pointer-events: none;
   font-family: 'JetBrains Mono', monospace;
 }
+.timeline-bookmark-delete {
+  position: absolute;
+  top: 2px;
+  left: -6px;
+  width: 14px;
+  height: 14px;
+  background: #ffa726;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  font-size: 9px;
+  line-height: 14px;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 9;
+}
+.timeline-bookmark:hover .timeline-bookmark-delete { opacity: 1; }
 
 .waveform-inner {
   position: relative;
@@ -2088,6 +2107,144 @@ button.action-btn.musicgen-btn:hover:not(:disabled) {
 
 .silence-region-handle:hover::after {
   opacity: 1;
+}
+
+/* ── Volume Region Overlays ── */
+
+.volume-region-overlay {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: rgba(38, 166, 154, 0.25);
+  border-left: 2px solid #26a69a;
+  border-right: 2px solid #26a69a;
+  z-index: 5;
+  cursor: move;
+  transition: background var(--transition-fast);
+}
+
+.volume-region-overlay:hover {
+  background: rgba(38, 166, 154, 0.38);
+}
+
+.volume-region-delete {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  background: #26a69a;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  z-index: 6;
+}
+
+.volume-region-overlay:hover .volume-region-delete {
+  opacity: 1;
+}
+
+.volume-region-handle {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 6;
+}
+
+.volume-region-handle-left {
+  left: -4px;
+}
+
+.volume-region-handle-right {
+  right: -4px;
+}
+
+.volume-region-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 100%;
+  border-radius: 1px;
+  background: #26a69a;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.volume-region-handle-left::after {
+  left: 3px;
+}
+
+.volume-region-handle-right::after {
+  right: 2px;
+}
+
+.volume-region-handle:hover::after {
+  opacity: 1;
+}
+
+.volume-region-slider {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  right: 20px;
+  height: 12px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(38, 166, 154, 0.3);
+  border-radius: 6px;
+  outline: none;
+  cursor: pointer;
+  z-index: 6;
+}
+
+.volume-region-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #26a69a;
+  cursor: pointer;
+}
+
+.volume-region-level-label {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 0.6rem;
+  color: #26a69a;
+  font-family: 'JetBrains Mono', monospace;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.volume-region-row-slider {
+  width: 50px;
+  height: 14px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(38, 166, 154, 0.2);
+  border-radius: 6px;
+  outline: none;
+  cursor: pointer;
+  margin: 0 4px;
+}
+
+.volume-region-row-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #26a69a;
+  cursor: pointer;
 }
 
 /* ── Silence Region Controls in Track Row ── */
