@@ -596,8 +596,112 @@ button.action-btn:disabled {
   display: block;
 }
 
-/* Waveform */
-.waveform-wrap {
+/* ── Track List ── */
+.track-list {
+  margin-bottom: 20px;
+}
+
+.track-list-title {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.track-list-items {
+  list-style: none;
+  max-height: 320px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-medium) transparent;
+}
+
+.track-list-items::-webkit-scrollbar { width: 4px; }
+.track-list-items::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 2px;
+}
+
+.track-row {
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--track-color, var(--accent-primary));
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 6px;
+}
+
+.track-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.track-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--track-color, var(--accent-primary));
+  flex-shrink: 0;
+}
+
+.track-name {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track-remove-btn {
+  background: none;
+  border: none;
+  color: var(--accent-primary);
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0 4px;
+  width: auto;
+  margin: 0;
+  line-height: 1;
+  transition: color var(--transition-fast);
+}
+
+.track-remove-btn:hover {
+  color: var(--accent-primary-hover);
+}
+
+.track-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.track-controls label {
+  font-weight: 600;
+  min-width: 24px;
+  color: var(--text-muted);
+}
+
+.track-controls input[type="range"] {
+  flex: 1;
+  max-width: 100px;
+  accent-color: var(--track-color, var(--accent-primary));
+}
+
+.track-vol-val,
+.track-pan-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  min-width: 32px;
+  text-align: right;
+  color: var(--accent-green);
+}
+
+/* ── Multi-lane Waveform Container ── */
+.waveform-container {
   position: relative;
   margin-bottom: 10px;
   user-select: none;
@@ -608,12 +712,21 @@ button.action-btn:disabled {
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-.waveform-wrap canvas {
+.waveform-lane {
+  position: relative;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.waveform-lane:last-child {
+  border-bottom: none;
+}
+
+.waveform-lane canvas {
   width: 100%;
-  height: 130px;
+  height: 100px;
   display: block;
   background: var(--bg-deepest);
-  cursor: crosshair;
+  cursor: pointer;
 }
 
 /* Trim overlays */
@@ -668,21 +781,46 @@ button.action-btn:disabled {
   box-shadow: 0 0 6px rgba(233, 69, 96, 0.4);
 }
 
-/* Playhead */
+/* Playhead — interactive, draggable */
 .playhead {
   position: absolute;
   top: 0;
   width: 2px;
   height: 100%;
   background: #fff;
-  pointer-events: none;
-  z-index: 4;
-  display: none;
+  z-index: 10;
+  left: 0%;
+  display: block;
   box-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
+  pointer-events: auto;
+  cursor: grab;
 }
 
-.playhead.active {
-  display: block;
+.playhead:active {
+  cursor: grabbing;
+}
+
+/* Wider hit target */
+.playhead::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -6px;
+  width: 14px;
+  height: 100%;
+}
+
+/* Triangle knob at top */
+.playhead::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -5px;
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid #fff;
 }
 
 /* Trim times */
@@ -957,5 +1095,17 @@ button.action-btn.separator-btn:hover:not(:disabled) {
 
   .controls {
     flex-wrap: wrap;
+  }
+
+  .track-controls {
+    flex-wrap: wrap;
+  }
+
+  .track-controls input[type="range"] {
+    max-width: none;
+  }
+
+  .waveform-lane canvas {
+    height: 70px;
   }
 }

@@ -74,12 +74,22 @@
 
   // Listen for editor file loads
   window.addEventListener('editor-file-loaded', (e) => {
-    currentFile = e.detail.file;
-    currentFileName = e.detail.fileName;
     // Reset previous results
     resultsEl.style.display = 'none';
     hideError(errorBox);
     hideStatus();
+
+    // Multi-track mode: separator only works with a single track
+    if (e.detail.multiTrack) {
+      currentFile = null;
+      currentFileName = '';
+      startBtn.disabled = true;
+      startBtn.textContent = 'Separator requires single track mode';
+      return;
+    }
+
+    currentFile = e.detail.file;
+    currentFileName = e.detail.fileName;
 
     if (gradioReady) {
       startBtn.disabled = false;

@@ -128,11 +128,11 @@
     <!-- ════════════════════════════════════════════ -->
     <div class="tab-panel" id="tab-editor">
       <h2>MP3 Editor</h2>
-      <p class="subtitle">Trim, crop, add fade effects, and separate vocals from a single MP3.</p>
+      <p class="subtitle">Upload multiple MP3s, mix with volume &amp; pan controls, trim, fade, and export.</p>
 
       <div class="upload-area" id="ed-uploadArea">
-        <input type="file" id="ed-fileInput" accept=".mp3,audio/mpeg">
-        <p class="upload-label">Click or drag an MP3 file here</p>
+        <input type="file" id="ed-fileInput" accept=".mp3,audio/mpeg" multiple>
+        <p class="upload-label">Click or drag MP3 files here (add more anytime)</p>
         <p class="file-name" id="ed-fileName"></p>
       </div>
       <div class="upload-alt">
@@ -140,12 +140,19 @@
       </div>
 
       <div class="gdrive-notice" id="ed-gdriveNotice"></div>
+
+      <!-- Track list -->
+      <div class="track-list" id="ed-trackList" style="display:none;">
+        <p class="track-list-title">Tracks: <span id="ed-trackCount">0</span></p>
+        <ul class="track-list-items" id="ed-trackListItems"></ul>
+      </div>
+
       <div class="error" id="ed-errorBox"></div>
 
       <div class="editor-workspace" id="ed-workspace">
-        <!-- Waveform -->
-        <div class="waveform-wrap" id="ed-waveformWrap">
-          <canvas id="ed-canvas"></canvas>
+        <!-- Multi-track waveform -->
+        <div class="waveform-container" id="ed-waveformContainer">
+          <div class="waveform-lanes" id="ed-waveformLanes"></div>
           <div class="trim-overlay-left" id="ed-overlayLeft"></div>
           <div class="trim-overlay-right" id="ed-overlayRight"></div>
           <div class="trim-handle trim-handle-left" id="ed-handleLeft"></div>
@@ -181,7 +188,7 @@
         </div>
 
         <!-- Export -->
-        <button class="action-btn" id="ed-exportBtn">Export Edited MP3</button>
+        <button class="action-btn" id="ed-exportBtn">Export Mixed MP3</button>
 
         <div class="progress-wrap" id="ed-progressWrap">
           <div class="progress-bar"><div class="fill" id="ed-progressFill"></div></div>
