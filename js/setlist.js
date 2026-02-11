@@ -19,14 +19,10 @@
   const resultInfo  = document.getElementById('sl-resultInfo');
   const audioPreview = document.getElementById('sl-audioPreview');
   const errorBox    = document.getElementById('sl-errorBox');
-  const gdriveBtn   = document.getElementById('sl-gdriveBtn');
-  const gdriveNotice = document.getElementById('sl-gdriveNotice');
 
   let uploadedSongs = new Map();
 
   function sp(pct, text) { setProgress(progressFill, progressTextEl, pct, text); }
-
-  showGdriveSetupNotice(gdriveNotice);
 
   /* ── File upload handling ── */
   uploadArea.addEventListener('click', () => fileInput.click());
@@ -38,33 +34,6 @@
     handleFiles(e.dataTransfer.files);
   });
   fileInput.addEventListener('change', () => handleFiles(fileInput.files));
-
-  // Google Drive import for set list (multi-select)
-  gdriveBtn.addEventListener('click', async () => {
-    try {
-      gdriveBtn.disabled = true;
-      gdriveBtn.textContent = 'Opening Drive...';
-      const results = await openDrivePicker(true);
-      if (results.length > 0) {
-        for (const { name, blob } of results) {
-          const file = new File([blob], name, { type: 'audio/mpeg' });
-          uploadedSongs.set(file.name, file);
-        }
-        hideError(errorBox);
-        refreshFileList();
-        refreshSlotDropdowns();
-        uploadArea.classList.add('has-file');
-        fileStatus.textContent = uploadedSongs.size + ' song' + (uploadedSongs.size !== 1 ? 's' : '') + ' loaded';
-        updateProcessBtnState();
-      }
-    } catch (err) {
-      console.error(err);
-      showError(errorBox, 'Google Drive import failed: ' + err.message);
-    } finally {
-      gdriveBtn.disabled = false;
-      gdriveBtn.textContent = 'Import from Google Drive';
-    }
-  });
 
   function handleFiles(files) {
     let added = 0;

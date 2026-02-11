@@ -15,14 +15,10 @@
   const resultInfo = document.getElementById('rpt-resultInfo');
   const audioPreview = document.getElementById('rpt-audioPreview');
   const errorBox   = document.getElementById('rpt-errorBox');
-  const gdriveBtn  = document.getElementById('rpt-gdriveBtn');
-  const gdriveNotice = document.getElementById('rpt-gdriveNotice');
 
   let selectedFile = null;
 
   function sp(pct, text) { setProgress(progressFill, progressTextEl, pct, text); }
-
-  showGdriveSetupNotice(gdriveNotice);
 
   uploadArea.addEventListener('click', () => fileInput.click());
   uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
@@ -33,26 +29,6 @@
     if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
   });
   fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
-
-  // Google Drive import for repeater (single file)
-  gdriveBtn.addEventListener('click', async () => {
-    try {
-      gdriveBtn.disabled = true;
-      gdriveBtn.textContent = 'Opening Drive...';
-      const results = await openDrivePicker(false);
-      if (results.length > 0) {
-        const { name, blob } = results[0];
-        const file = new File([blob], name, { type: 'audio/mpeg' });
-        handleFile(file);
-      }
-    } catch (err) {
-      console.error(err);
-      showError(errorBox, 'Google Drive import failed: ' + err.message);
-    } finally {
-      gdriveBtn.disabled = false;
-      gdriveBtn.textContent = 'Import from Google Drive';
-    }
-  });
 
   function handleFile(file) {
     if (!file.name.toLowerCase().endsWith('.mp3') && file.type !== 'audio/mpeg') {

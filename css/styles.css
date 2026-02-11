@@ -233,64 +233,6 @@ h2::after {
   word-break: break-all;
 }
 
-/* ── Google Drive ── */
-.upload-alt {
-  text-align: center;
-  margin-bottom: 20px;
-  font-size: 0.82rem;
-  color: var(--text-dimmed);
-}
-
-.upload-alt .gdrive-btn {
-  background: none;
-  border: 1px solid var(--accent-blue);
-  color: var(--accent-blue);
-  padding: 5px 14px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-family: 'Inter', sans-serif;
-  font-size: 0.82rem;
-  font-weight: 600;
-  transition: background var(--transition-fast), color var(--transition-fast);
-  width: auto;
-  margin-left: 6px;
-}
-
-.upload-alt .gdrive-btn:hover {
-  background: var(--accent-blue);
-  color: #fff;
-}
-
-.upload-alt .gdrive-btn:disabled {
-  border-color: var(--text-dimmed);
-  color: var(--text-dimmed);
-  cursor: not-allowed;
-  background: none;
-}
-
-.gdrive-notice {
-  display: none;
-  background: var(--accent-blue-glow);
-  border: 1px solid rgba(66, 133, 244, 0.3);
-  border-radius: var(--radius-md);
-  padding: 10px 14px;
-  margin-bottom: 16px;
-  font-size: 0.8rem;
-  color: #8ab4f8;
-  line-height: 1.4;
-}
-
-.gdrive-notice.active {
-  display: block;
-}
-
-.gdrive-notice code {
-  background: rgba(0, 0, 0, 0.3);
-  padding: 1px 5px;
-  border-radius: 3px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.78rem;
-}
 
 /* ── Controls ── */
 .controls {
@@ -658,11 +600,6 @@ button.action-btn:disabled {
 .editor-file-panel .upload-alt {
   margin-bottom: 0;
   font-size: 0.78rem;
-}
-
-.editor-file-panel .gdrive-notice {
-  margin-bottom: 0;
-  margin-top: 8px;
 }
 
 .file-panel-list {
@@ -1583,6 +1520,28 @@ body.drag-in-progress .track-drop-zone .drop-zone-text {
     height: 32px;
     font-size: 0.9rem;
   }
+}
+
+/* ═══════════════════════════════════════════════
+   MP3 / WAV Converter
+   ═══════════════════════════════════════════════ */
+
+.converter-format-row {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.converter-format-badge {
+  display: inline-block;
+  background: var(--accent-blue-glow);
+  border: 1px solid rgba(66, 133, 244, 0.4);
+  color: var(--accent-blue);
+  padding: 6px 18px;
+  border-radius: 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 1px;
 }
 
 /* ═══════════════════════════════════════════════

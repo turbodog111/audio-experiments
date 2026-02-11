@@ -34,9 +34,10 @@
     }
 
     var map = {
-      repeater: 'guide-repeater',
-      setlist:  'guide-setlist',
-      editor:   'guide-editor'
+      repeater:  'guide-repeater',
+      setlist:   'guide-setlist',
+      editor:    'guide-editor',
+      converter: 'guide-converter'
     };
 
     var targetId = map[tabName];

@@ -9,8 +9,6 @@
   var fileInput       = document.getElementById('ed-fileInput');
   var fileNameEl      = document.getElementById('ed-fileName');
   var errorBox        = document.getElementById('ed-errorBox');
-  var gdriveBtn       = document.getElementById('ed-gdriveBtn');
-  var gdriveNotice    = document.getElementById('ed-gdriveNotice');
   var workspace       = document.getElementById('ed-workspace');
   var addTrackBtn     = document.getElementById('ed-addTrackBtn');
   var trackCountEl    = document.getElementById('ed-trackCount');
@@ -133,8 +131,6 @@
   var fxNodes = {};          // alias for master chain nodes (live update)
 
   function sp(pct, text) { setProgress(progressFill, progressTextEl, pct, text); }
-
-  showGdriveSetupNotice(gdriveNotice);
 
   /* ═══════════════════════════════════════════════
      Helpers
@@ -328,25 +324,6 @@
   fileInput.addEventListener('change', function() {
     if (fileInput.files.length > 0) addFilesToLibrary(fileInput.files);
     fileInput.value = '';
-  });
-
-  gdriveBtn.addEventListener('click', async function() {
-    try {
-      gdriveBtn.disabled = true;
-      gdriveBtn.textContent = 'Opening Drive...';
-      var results = await openDrivePicker(true);
-      if (results.length > 0) {
-        var files = results.map(function(r) {
-          return new File([r.blob], r.name, { type: 'audio/mpeg' });
-        });
-        await addFilesToLibrary(files);
-      }
-    } catch (err) {
-      showError(errorBox, 'Google Drive import failed: ' + err.message);
-    } finally {
-      gdriveBtn.disabled = false;
-      gdriveBtn.textContent = 'Import from Google Drive';
-    }
   });
 
   async function addFilesToLibrary(fileList) {
@@ -976,12 +953,13 @@
       var rect = lane.getBoundingClientRect();
       var startX = e.clientX;
       var origOffset = slot.startOffset;
+      var origDuration = totalDuration || 1;
       overlay.classList.add('dragging');
 
       var onMove = function(ev) {
         ev.preventDefault();
         var dx = ev.clientX - startX;
-        var dtSec = (dx / rect.width) * totalDuration;
+        var dtSec = (dx / rect.width) * origDuration;
         var newOffset = origOffset + dtSec;
         // Snap to 0.1s unless Shift held
         if (!ev.shiftKey) newOffset = Math.round(newOffset * 10) / 10;
@@ -994,6 +972,7 @@
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
         overlay.classList.remove('dragging');
+        updateTrimUI();
       };
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
@@ -1006,11 +985,12 @@
       var rect = lane.getBoundingClientRect();
       var lf = getLibFile(slot.assignedFileId);
       if (!lf) return;
+      var origDuration = totalDuration || 1;
 
       var onMove = function(ev) {
         ev.preventDefault();
         var xRatio = (ev.clientX - rect.left) / rect.width;
-        var timelineSec = xRatio * totalDuration;
+        var timelineSec = xRatio * origDuration;
         var newClipEnd = timelineSec - slot.startOffset + (slot.clipStart || 0);
         if (!ev.shiftKey) newClipEnd = Math.round(newClipEnd * 10) / 10;
         newClipEnd = Math.max((slot.clipStart || 0) + 0.1, Math.min(newClipEnd, lf.buffer.duration));
@@ -1022,6 +1002,7 @@
       var onUp = function() {
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
+        updateTrimUI();
       };
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
@@ -1036,12 +1017,13 @@
       if (!lf) return;
       var origStartOffset = slot.startOffset;
       var origClipStart = slot.clipStart || 0;
+      var origDuration = totalDuration || 1;
       var rightEdgeTime = origStartOffset + effectiveDuration(slot);
 
       var onMove = function(ev) {
         ev.preventDefault();
         var xRatio = (ev.clientX - rect.left) / rect.width;
-        var timelineSec = xRatio * totalDuration;
+        var timelineSec = xRatio * origDuration;
         if (!ev.shiftKey) timelineSec = Math.round(timelineSec * 10) / 10;
         timelineSec = Math.max(0, Math.min(timelineSec, rightEdgeTime - 0.1));
         var delta = timelineSec - origStartOffset;
@@ -1054,6 +1036,7 @@
       var onUp = function() {
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
+        updateTrimUI();
       };
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);

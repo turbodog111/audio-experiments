@@ -32,6 +32,49 @@ function floatTo16(floatArr) {
   return int16;
 }
 
+function encodeWAV(channels, sampleRate, numChannels, totalSamples) {
+  var bytesPerSample = 2; // 16-bit PCM
+  var dataSize = totalSamples * numChannels * bytesPerSample;
+  var buffer = new ArrayBuffer(44 + dataSize);
+  var view = new DataView(buffer);
+
+  function writeString(offset, str) {
+    for (var i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+  }
+
+  // RIFF header
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(8, 'WAVE');
+
+  // fmt sub-chunk
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);           // sub-chunk size
+  view.setUint16(20, 1, true);            // PCM format
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * numChannels * bytesPerSample, true); // byte rate
+  view.setUint16(32, numChannels * bytesPerSample, true);              // block align
+  view.setUint16(34, 16, true);           // bits per sample
+
+  // data sub-chunk
+  writeString(36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  // Interleave and write PCM samples
+  var offset = 44;
+  for (var i = 0; i < totalSamples; i++) {
+    for (var ch = 0; ch < numChannels; ch++) {
+      var s = channels[ch] ? channels[ch][i] || 0 : 0;
+      s = s < -1 ? -1 : s > 1 ? 1 : s;
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      offset += 2;
+    }
+  }
+
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
 function encodeMP3(channels, sampleRate, numChannels, totalSamples, progressCb) {
   return new Promise((resolve) => {
     const kbps = 192;
