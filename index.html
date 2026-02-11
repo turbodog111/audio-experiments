@@ -173,6 +173,12 @@
               <button id="ed-distortToggle">Distortion</button>
             </div>
 
+            <!-- FX Target Selector -->
+            <div class="fx-target-bar" id="ed-fxTargetBar">
+              <span class="fx-target-label">Effects target:</span>
+              <div class="fx-target-pills" id="ed-fxTargetPills"></div>
+            </div>
+
             <!-- Fade controls -->
             <div class="effect-controls" id="ed-fadeControls">
               <div class="effect-section-title">Fade In / Out</div>
@@ -363,6 +369,62 @@
     </div>
   </div>
 
+  <!-- Help Guide Button -->
+  <button class="guide-toggle-btn" id="guideToggleBtn" title="Help Guide">?</button>
+
+  <!-- Help Guide Sidebar -->
+  <div class="guide-sidebar" id="guideSidebar">
+    <div class="guide-header">
+      <h3>Help Guide</h3>
+      <button class="guide-close-btn" id="guideCloseBtn">&times;</button>
+    </div>
+    <div class="guide-content">
+      <div class="guide-section" id="guide-repeater">
+        <h4>MP3 Repeater</h4>
+        <ol>
+          <li>Upload an MP3 file by clicking the upload area or dragging a file onto it.</li>
+          <li>Set the <strong>Total plays</strong> count (e.g. 3 = the song plays 3 times total).</li>
+          <li>Click <strong>"Create Repeated MP3"</strong> to process.</li>
+          <li>Preview the result and click <strong>"Download Repeated MP3"</strong> to save.</li>
+        </ol>
+      </div>
+      <div class="guide-section" id="guide-setlist">
+        <h4>Set List Creator</h4>
+        <ol>
+          <li>Upload multiple MP3 files using the upload area (supports multi-select and drag-and-drop).</li>
+          <li>Set the number of songs in your set list and click <strong>"Update slots"</strong>.</li>
+          <li>Assign songs to each slot using the dropdown selectors.</li>
+          <li>Click <strong>"Create Set List MP3"</strong> to combine into one file.</li>
+          <li>Preview and download the combined MP3.</li>
+        </ol>
+      </div>
+      <div class="guide-section" id="guide-editor">
+        <h4>MP3 Editor</h4>
+        <ol>
+          <li>Upload MP3 files to the <strong>File Library</strong> (right panel).</li>
+          <li>Click <strong>"+ Add Track"</strong> to create blank track slots.</li>
+          <li>Drag files from the library onto track slots to assign them.</li>
+          <li>Adjust <strong>Volume</strong> (0&ndash;150%) and <strong>Pan</strong> (L/R) per track.</li>
+          <li><strong>Drag track blocks</strong> on the timeline to set their start position. Hold <kbd>Shift</kbd> for fine positioning.</li>
+          <li><strong>Drag the left/right edges</strong> of track blocks to trim audio individually.</li>
+          <li>Use the green (start) and red (end) <strong>trim handles</strong> for global selection bounds.</li>
+          <li>Toggle effects: <strong>EQ</strong>, <strong>Compressor</strong>, <strong>Reverb</strong>, <strong>Delay</strong>, <strong>Distortion</strong>.</li>
+          <li>Select a target (<strong>Master</strong> or individual track) above the effect panels to apply effects per-track or globally.</li>
+          <li>Click <strong>Play (Space)</strong> to preview. Click <strong>"Export Mixed MP3"</strong> to download the final file.</li>
+        </ol>
+      </div>
+      <div class="guide-section" id="guide-shortcuts">
+        <h4>Keyboard Shortcuts</h4>
+        <ul class="guide-shortcuts-list">
+          <li><kbd>Space</kbd> Play / Stop (editor tab)</li>
+          <li><kbd>Click</kbd> on timeline to move playhead</li>
+          <li><kbd>Shift</kbd> + drag for fine positioning (no snap)</li>
+          <li><kbd>Esc</kbd> Close this help panel</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
   <!-- Footer -->
   <footer class="footer">
     <p>MP3 Master Editor &mdash; Browser-based audio tools. Your files stay local.</p>
@@ -377,6 +439,7 @@
   <script src="js/setlist.js"></script>
   <script src="js/editor.js"></script>
   <script src="js/separator.js"></script>
+  <script src="js/guide.js"></script>
 
   <!-- Gradio client (ES module) bridged to global scope -->
   <script type="module">

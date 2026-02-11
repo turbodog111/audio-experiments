@@ -19,6 +19,7 @@
   var libraryFooter   = document.getElementById('ed-libraryFooter');
   var waveformContainer = document.getElementById('ed-waveformContainer');
   var waveformLanes   = document.getElementById('ed-waveformLanes');
+  var fxTargetPills   = document.getElementById('ed-fxTargetPills');
   var overlayLeft     = document.getElementById('ed-overlayLeft');
   var overlayRight    = document.getElementById('ed-overlayRight');
   var handleLeft      = document.getElementById('ed-handleLeft');
@@ -116,15 +117,20 @@
   var draggedFileId = null;
 
   /* ── Effects state ── */
-  var fxEnabled = { eq: false, compressor: false, reverb: false, delay: false, distortion: false };
+  function createDefaultFxSettings() {
+    return {
+      eq:         { enabled: false, low: 0, mid: 0, high: 0 },
+      compressor: { enabled: false, threshold: -24, ratio: 4, attack: 10, release: 250 },
+      reverb:     { enabled: false, decay: 2, mix: 30 },
+      delay:      { enabled: false, time: 300, feedback: 40, mix: 25 },
+      distortion: { enabled: false, drive: 50, tone: 3000 }
+    };
+  }
+  var masterFxSettings = createDefaultFxSettings();
+  var fxTarget = 'master';   // 'master' or a track slot ID
   var masterGain = null;
-  var fxNodes = {
-    eqLow: null, eqMid: null, eqHigh: null,
-    compressor: null,
-    reverbConvolver: null, reverbDryGain: null, reverbWetGain: null,
-    delayNode: null, delayFeedbackGain: null, delayDryGain: null, delayWetGain: null,
-    distortShaper: null, distortToneFilter: null
-  };
+  var activeFxChains = {};   // keyed by 'master' or slot ID → { nodes }
+  var fxNodes = {};          // alias for master chain nodes (live update)
 
   function sp(pct, text) { setProgress(progressFill, progressTextEl, pct, text); }
 
@@ -160,6 +166,122 @@
       if (trackSlots[i].assignedFileId !== null) out.push(trackSlots[i]);
     }
     return out;
+  }
+
+  function effectiveDuration(slot) {
+    var lf = getLibFile(slot.assignedFileId);
+    if (!lf) return 0;
+    var full = lf.buffer.duration;
+    var start = slot.clipStart || 0;
+    var end = slot.clipEnd !== null ? Math.min(slot.clipEnd, full) : full;
+    return Math.max(0, end - start);
+  }
+
+  function getActiveFxSettings() {
+    if (fxTarget === 'master') return masterFxSettings;
+    for (var i = 0; i < trackSlots.length; i++) {
+      if (trackSlots[i].id === fxTarget) return trackSlots[i].fx;
+    }
+    return masterFxSettings;
+  }
+
+  function hasAnyFx(fxSettings) {
+    return fxSettings.eq.enabled || fxSettings.compressor.enabled ||
+           fxSettings.reverb.enabled || fxSettings.delay.enabled ||
+           fxSettings.distortion.enabled;
+  }
+
+  /* ── FX UI sync helpers ── */
+
+  function syncToggleBtn(btn, panel, enabled) {
+    if (enabled) {
+      btn.classList.add('active-effect');
+      panel.classList.add('active');
+    } else {
+      btn.classList.remove('active-effect');
+      panel.classList.remove('active');
+    }
+  }
+
+  function syncSlider(rangeEl, valEl, value, formatFn) {
+    rangeEl.value = value;
+    valEl.textContent = formatFn(value);
+  }
+
+  function getLiveNodes() {
+    var chain = activeFxChains[fxTarget];
+    return chain ? chain.nodes : null;
+  }
+
+  function syncFxUI() {
+    var s = getActiveFxSettings();
+
+    syncToggleBtn(eqToggle, eqControls, s.eq.enabled);
+    syncToggleBtn(compToggle, compControls, s.compressor.enabled);
+    syncToggleBtn(reverbToggle, reverbControls, s.reverb.enabled);
+    syncToggleBtn(delayToggle, delayControls, s.delay.enabled);
+    syncToggleBtn(distortToggle, distortControls, s.distortion.enabled);
+
+    syncSlider(eqLowRange, eqLowVal, s.eq.low, function(v) { return parseFloat(v).toFixed(1) + ' dB'; });
+    syncSlider(eqMidRange, eqMidVal, s.eq.mid, function(v) { return parseFloat(v).toFixed(1) + ' dB'; });
+    syncSlider(eqHighRange, eqHighVal, s.eq.high, function(v) { return parseFloat(v).toFixed(1) + ' dB'; });
+
+    syncSlider(compThreshRange, compThreshVal, s.compressor.threshold, function(v) { return v + ' dB'; });
+    syncSlider(compRatioRange, compRatioVal, s.compressor.ratio, function(v) { return parseFloat(v).toFixed(1) + ':1'; });
+    syncSlider(compAttackRange, compAttackVal, s.compressor.attack, function(v) { return v + ' ms'; });
+    syncSlider(compReleaseRange, compReleaseVal, s.compressor.release, function(v) { return v + ' ms'; });
+
+    syncSlider(reverbDecayRange, reverbDecayVal, s.reverb.decay, function(v) { return parseFloat(v).toFixed(1) + ' s'; });
+    syncSlider(reverbMixRange, reverbMixVal, s.reverb.mix, function(v) { return v + '%'; });
+
+    syncSlider(delayTimeRange, delayTimeVal, s.delay.time, function(v) { return v + ' ms'; });
+    syncSlider(delayFbRange, delayFbVal, s.delay.feedback, function(v) { return v + '%'; });
+    syncSlider(delayMixRange, delayMixVal, s.delay.mix, function(v) { return v + '%'; });
+
+    syncSlider(distortDriveRange, distortDriveVal, s.distortion.drive, function(v) { return v; });
+    syncSlider(distortToneRange, distortToneVal, s.distortion.tone, function(v) { return v + ' Hz'; });
+  }
+
+  function setFxTarget(target) {
+    fxTarget = target;
+    syncFxUI();
+    rebuildFxTargetPills();
+  }
+
+  function rebuildFxTargetPills() {
+    // If target is a removed/unassigned slot, reset to master
+    if (fxTarget !== 'master') {
+      var found = false;
+      for (var i = 0; i < trackSlots.length; i++) {
+        if (trackSlots[i].id === fxTarget && trackSlots[i].assignedFileId !== null) {
+          found = true; break;
+        }
+      }
+      if (!found) { fxTarget = 'master'; syncFxUI(); }
+    }
+
+    fxTargetPills.innerHTML = '';
+
+    var masterPill = document.createElement('button');
+    masterPill.className = 'fx-target-pill' + (fxTarget === 'master' ? ' active' : '');
+    masterPill.textContent = 'Master';
+    masterPill.addEventListener('click', function() { setFxTarget('master'); });
+    fxTargetPills.appendChild(masterPill);
+
+    for (var i = 0; i < trackSlots.length; i++) {
+      (function(slot, index) {
+        if (slot.assignedFileId === null) return;
+        var pill = document.createElement('button');
+        pill.className = 'fx-target-pill' + (fxTarget === slot.id ? ' active' : '');
+        pill.textContent = 'Track ' + (index + 1);
+        var color = TRACK_COLORS[index % TRACK_COLORS.length];
+        pill.style.borderColor = color;
+        if (fxTarget === slot.id) pill.style.background = color + '33';
+        if (hasAnyFx(slot.fx)) pill.style.boxShadow = '0 0 6px ' + color + '66';
+        pill.addEventListener('click', function() { setFxTarget(slot.id); });
+        fxTargetPills.appendChild(pill);
+      })(trackSlots[i], i);
+    }
   }
 
   /* ═══════════════════════════════════════════════
@@ -386,7 +508,12 @@
       canvas: null,
       gainNode: null,
       panNode: null,
-      sourceNode: null
+      sourceNode: null,
+      fx: createDefaultFxSettings(),
+      fxChainNodes: null,
+      startOffset: 0,
+      clipStart: 0,
+      clipEnd: null
     });
     rebuildTracksUI();
     updateTrackCount();
@@ -440,6 +567,9 @@
     if (!slot || !getLibFile(fileId)) return;
 
     slot.assignedFileId = fileId;
+    slot.startOffset = 0;
+    slot.clipStart = 0;
+    slot.clipEnd = null;
     rebuildTracksUI();
     recalcDuration();
     buildWaveformLanes();
@@ -599,6 +729,34 @@
           assigned.appendChild(canvas);
           slot.canvas = canvas;
 
+          // FX badges
+          var fxLabels = [
+            { key: 'eq', label: 'EQ' },
+            { key: 'compressor', label: 'C' },
+            { key: 'reverb', label: 'R' },
+            { key: 'delay', label: 'D' },
+            { key: 'distortion', label: 'Dist' }
+          ];
+          var badgesDiv = document.createElement('div');
+          badgesDiv.className = 'track-fx-badges';
+          for (var f = 0; f < fxLabels.length; f++) {
+            if (slot.fx[fxLabels[f].key].enabled) {
+              var badge = document.createElement('span');
+              badge.className = 'fx-badge';
+              badge.textContent = fxLabels[f].label;
+              badgesDiv.appendChild(badge);
+            }
+          }
+          if (badgesDiv.children.length > 0) infoBar.appendChild(badgesDiv);
+
+          // Offset label
+          if (slot.startOffset > 0) {
+            var offLabel = document.createElement('span');
+            offLabel.className = 'track-offset-label';
+            offLabel.textContent = '@' + fmtTime(slot.startOffset);
+            infoBar.appendChild(offLabel);
+          }
+
           // Draw mini waveform after append
           setTimeout(function() { drawMiniWaveform(lf.buffer, canvas, color); }, 0);
 
@@ -694,6 +852,7 @@
     }
 
     updateTrackCount();
+    rebuildFxTargetPills();
   }
 
   /* ═══════════════════════════════════════════════
@@ -751,10 +910,8 @@
     totalDuration = 0;
     var assigned = getAssignedSlots();
     for (var i = 0; i < assigned.length; i++) {
-      var lf = getLibFile(assigned[i].assignedFileId);
-      if (lf && lf.buffer.duration > totalDuration) {
-        totalDuration = lf.buffer.duration;
-      }
+      var end = assigned[i].startOffset + effectiveDuration(assigned[i]);
+      if (end > totalDuration) totalDuration = end;
     }
   }
 
@@ -772,9 +929,135 @@
       canvas.className = 'lane-canvas';
       lane.appendChild(canvas);
 
+      // Track block overlay for dragging
+      var overlay = document.createElement('div');
+      overlay.className = 'track-block-overlay';
+      lane.appendChild(overlay);
+
+      // Left clip handle (slip edit)
+      var leftHandle = document.createElement('div');
+      leftHandle.className = 'track-clip-handle track-clip-handle-left';
+      overlay.appendChild(leftHandle);
+
+      // Right clip handle
+      var rightHandle = document.createElement('div');
+      rightHandle.className = 'track-clip-handle track-clip-handle-right';
+      overlay.appendChild(rightHandle);
+
       waveformLanes.appendChild(lane);
       assigned[i]._globalCanvas = canvas;
+      assigned[i]._overlay = overlay;
+      assigned[i]._leftHandle = leftHandle;
+      assigned[i]._rightHandle = rightHandle;
+
+      initTrackBlockDrag(overlay, leftHandle, rightHandle, assigned[i], lane);
     }
+    updateAllOverlays();
+  }
+
+  function updateAllOverlays() {
+    var assigned = getAssignedSlots();
+    for (var i = 0; i < assigned.length; i++) {
+      var ov = assigned[i]._overlay;
+      if (!ov) continue;
+      var effDur = effectiveDuration(assigned[i]);
+      var leftPct = totalDuration > 0 ? (assigned[i].startOffset / totalDuration) * 100 : 0;
+      var widthPct = totalDuration > 0 ? (effDur / totalDuration) * 100 : 100;
+      ov.style.left = leftPct + '%';
+      ov.style.width = widthPct + '%';
+    }
+  }
+
+  function initTrackBlockDrag(overlay, leftHandle, rightHandle, slot, lane) {
+    // Block drag — move startOffset
+    overlay.addEventListener('mousedown', function(e) {
+      if (e.target === leftHandle || e.target === rightHandle) return;
+      e.preventDefault();
+      var rect = lane.getBoundingClientRect();
+      var startX = e.clientX;
+      var origOffset = slot.startOffset;
+      overlay.classList.add('dragging');
+
+      var onMove = function(ev) {
+        ev.preventDefault();
+        var dx = ev.clientX - startX;
+        var dtSec = (dx / rect.width) * totalDuration;
+        var newOffset = origOffset + dtSec;
+        // Snap to 0.1s unless Shift held
+        if (!ev.shiftKey) newOffset = Math.round(newOffset * 10) / 10;
+        slot.startOffset = Math.max(0, newOffset);
+        recalcDuration();
+        updateAllOverlays();
+        drawAllWaveforms();
+      };
+      var onUp = function() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        overlay.classList.remove('dragging');
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    // Right handle — adjust clipEnd
+    rightHandle.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var rect = lane.getBoundingClientRect();
+      var lf = getLibFile(slot.assignedFileId);
+      if (!lf) return;
+
+      var onMove = function(ev) {
+        ev.preventDefault();
+        var xRatio = (ev.clientX - rect.left) / rect.width;
+        var timelineSec = xRatio * totalDuration;
+        var newClipEnd = timelineSec - slot.startOffset + (slot.clipStart || 0);
+        if (!ev.shiftKey) newClipEnd = Math.round(newClipEnd * 10) / 10;
+        newClipEnd = Math.max((slot.clipStart || 0) + 0.1, Math.min(newClipEnd, lf.buffer.duration));
+        slot.clipEnd = newClipEnd;
+        recalcDuration();
+        updateAllOverlays();
+        drawAllWaveforms();
+      };
+      var onUp = function() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    // Left handle — slip edit (adjust startOffset + clipStart keeping right edge fixed)
+    leftHandle.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var rect = lane.getBoundingClientRect();
+      var lf = getLibFile(slot.assignedFileId);
+      if (!lf) return;
+      var origStartOffset = slot.startOffset;
+      var origClipStart = slot.clipStart || 0;
+      var rightEdgeTime = origStartOffset + effectiveDuration(slot);
+
+      var onMove = function(ev) {
+        ev.preventDefault();
+        var xRatio = (ev.clientX - rect.left) / rect.width;
+        var timelineSec = xRatio * totalDuration;
+        if (!ev.shiftKey) timelineSec = Math.round(timelineSec * 10) / 10;
+        timelineSec = Math.max(0, Math.min(timelineSec, rightEdgeTime - 0.1));
+        var delta = timelineSec - origStartOffset;
+        slot.startOffset = timelineSec;
+        slot.clipStart = Math.max(0, Math.min(origClipStart + delta, lf.buffer.duration - 0.1));
+        recalcDuration();
+        updateAllOverlays();
+        drawAllWaveforms();
+      };
+      var onUp = function() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
   }
 
   function drawAllWaveforms() {
@@ -783,11 +1066,11 @@
       var canvas = assigned[i]._globalCanvas;
       var lf = getLibFile(assigned[i].assignedFileId);
       if (!canvas || !lf) continue;
-      drawGlobalWaveform(lf.buffer, canvas, TRACK_COLORS[i % TRACK_COLORS.length]);
+      drawGlobalWaveform(lf.buffer, canvas, TRACK_COLORS[i % TRACK_COLORS.length], assigned[i]);
     }
   }
 
-  function drawGlobalWaveform(buffer, canvas, color) {
+  function drawGlobalWaveform(buffer, canvas, color, slot) {
     if (!canvas) return;
     var ctx = canvas.getContext('2d');
     var dpr = window.devicePixelRatio || 1;
@@ -802,12 +1085,24 @@
     var h = rect.height;
     var mid = h / 2;
     var data = buffer.getChannelData(0);
+    var sampleRate = buffer.sampleRate;
 
-    var trackWidthPx = totalDuration > 0 ? (buffer.duration / totalDuration) * w : w;
-    var step = Math.max(1, Math.floor(data.length / trackWidthPx));
+    var clipStart = slot ? (slot.clipStart || 0) : 0;
+    var clipEnd = slot ? (slot.clipEnd !== null ? Math.min(slot.clipEnd, buffer.duration) : buffer.duration) : buffer.duration;
+    var startOffset = slot ? (slot.startOffset || 0) : 0;
+    var clipDuration = Math.max(0, clipEnd - clipStart);
+
+    var startPx = totalDuration > 0 ? (startOffset / totalDuration) * w : 0;
+    var trackWidthPx = totalDuration > 0 ? (clipDuration / totalDuration) * w : w;
+
+    var clipStartSample = Math.floor(clipStart * sampleRate);
+    var clipEndSample = Math.floor(clipEnd * sampleRate);
+    var clipSamples = clipEndSample - clipStartSample;
+    var step = Math.max(1, Math.floor(clipSamples / trackWidthPx));
 
     ctx.clearRect(0, 0, w, h);
 
+    // Center line
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -815,21 +1110,22 @@
     ctx.lineTo(w, mid);
     ctx.stroke();
 
+    // Draw waveform at offset position
     for (var x = 0; x < trackWidthPx; x++) {
-      var start = Math.floor(x * data.length / trackWidthPx);
+      var sampleIdx = clipStartSample + Math.floor(x * clipSamples / trackWidthPx);
       var min = 0, max = 0;
       for (var j = 0; j < step; j++) {
-        var val = data[start + j] || 0;
+        var val = data[sampleIdx + j] || 0;
         if (val < min) min = val;
         if (val > max) max = val;
       }
       var top = mid + min * mid;
       var bottom = mid + max * mid;
       ctx.fillStyle = color;
-      ctx.fillRect(x, top, 1, bottom - top || 1);
+      ctx.fillRect(startPx + x, top, 1, bottom - top || 1);
     }
 
-    // Time markers
+    // Time markers (only on first lane)
     ctx.fillStyle = '#4a4a5e';
     ctx.font = '10px Inter, sans-serif';
     var numMarkers = Math.min(10, Math.floor(totalDuration));
@@ -980,9 +1276,10 @@
 
   function setupEffectToggle(btn, panel, fxKey) {
     btn.addEventListener('click', function() {
-      btn.classList.toggle('active-effect');
-      panel.classList.toggle('active');
-      fxEnabled[fxKey] = btn.classList.contains('active-effect');
+      var s = getActiveFxSettings();
+      s[fxKey].enabled = !s[fxKey].enabled;
+      syncToggleBtn(btn, panel, s[fxKey].enabled);
+      rebuildFxTargetPills();
       if (isPlaying) { stopPlayback(); startPlayback(); }
     });
   }
@@ -993,165 +1290,169 @@
   setupEffectToggle(delayToggle, delayControls, 'delay');
   setupEffectToggle(distortToggle, distortControls, 'distortion');
 
-  function setupSlider(rangeEl, valEl, formatFn, liveParamFn) {
+  function setupFxSlider(rangeEl, valEl, fxKey, paramKey, formatFn, liveParamFn) {
     rangeEl.addEventListener('input', function() {
-      valEl.textContent = formatFn(rangeEl.value);
-      if (liveParamFn) liveParamFn(parseFloat(rangeEl.value));
+      var val = parseFloat(rangeEl.value);
+      valEl.textContent = formatFn(val);
+      getActiveFxSettings()[fxKey][paramKey] = val;
+      if (liveParamFn) liveParamFn(val);
     });
   }
 
   // EQ sliders
-  setupSlider(eqLowRange, eqLowVal,
+  setupFxSlider(eqLowRange, eqLowVal, 'eq', 'low',
     function(v) { return parseFloat(v).toFixed(1) + ' dB'; },
-    function(v) { if (fxNodes.eqLow) fxNodes.eqLow.gain.value = v; });
-  setupSlider(eqMidRange, eqMidVal,
+    function(v) { var n = getLiveNodes(); if (n && n.eqLow) n.eqLow.gain.value = v; });
+  setupFxSlider(eqMidRange, eqMidVal, 'eq', 'mid',
     function(v) { return parseFloat(v).toFixed(1) + ' dB'; },
-    function(v) { if (fxNodes.eqMid) fxNodes.eqMid.gain.value = v; });
-  setupSlider(eqHighRange, eqHighVal,
+    function(v) { var n = getLiveNodes(); if (n && n.eqMid) n.eqMid.gain.value = v; });
+  setupFxSlider(eqHighRange, eqHighVal, 'eq', 'high',
     function(v) { return parseFloat(v).toFixed(1) + ' dB'; },
-    function(v) { if (fxNodes.eqHigh) fxNodes.eqHigh.gain.value = v; });
+    function(v) { var n = getLiveNodes(); if (n && n.eqHigh) n.eqHigh.gain.value = v; });
 
   // Compressor sliders
-  setupSlider(compThreshRange, compThreshVal,
+  setupFxSlider(compThreshRange, compThreshVal, 'compressor', 'threshold',
     function(v) { return v + ' dB'; },
-    function(v) { if (fxNodes.compressor) fxNodes.compressor.threshold.value = v; });
-  setupSlider(compRatioRange, compRatioVal,
+    function(v) { var n = getLiveNodes(); if (n && n.compressor) n.compressor.threshold.value = v; });
+  setupFxSlider(compRatioRange, compRatioVal, 'compressor', 'ratio',
     function(v) { return parseFloat(v).toFixed(1) + ':1'; },
-    function(v) { if (fxNodes.compressor) fxNodes.compressor.ratio.value = v; });
-  setupSlider(compAttackRange, compAttackVal,
+    function(v) { var n = getLiveNodes(); if (n && n.compressor) n.compressor.ratio.value = v; });
+  setupFxSlider(compAttackRange, compAttackVal, 'compressor', 'attack',
     function(v) { return v + ' ms'; },
-    function(v) { if (fxNodes.compressor) fxNodes.compressor.attack.value = v / 1000; });
-  setupSlider(compReleaseRange, compReleaseVal,
+    function(v) { var n = getLiveNodes(); if (n && n.compressor) n.compressor.attack.value = v / 1000; });
+  setupFxSlider(compReleaseRange, compReleaseVal, 'compressor', 'release',
     function(v) { return v + ' ms'; },
-    function(v) { if (fxNodes.compressor) fxNodes.compressor.release.value = v / 1000; });
+    function(v) { var n = getLiveNodes(); if (n && n.compressor) n.compressor.release.value = v / 1000; });
 
   // Reverb sliders
-  setupSlider(reverbDecayRange, reverbDecayVal,
+  setupFxSlider(reverbDecayRange, reverbDecayVal, 'reverb', 'decay',
     function(v) { return parseFloat(v).toFixed(1) + ' s'; }, null);
   reverbDecayRange.addEventListener('change', function() {
-    if (fxNodes.reverbConvolver && playCtx) {
-      fxNodes.reverbConvolver.buffer = generateReverbIR(playCtx, parseFloat(reverbDecayRange.value));
+    var n = getLiveNodes();
+    if (n && n.reverbConvolver && playCtx) {
+      n.reverbConvolver.buffer = generateReverbIR(playCtx, parseFloat(reverbDecayRange.value));
     }
   });
-  setupSlider(reverbMixRange, reverbMixVal,
+  setupFxSlider(reverbMixRange, reverbMixVal, 'reverb', 'mix',
     function(v) { return v + '%'; },
     function(v) {
       var wet = v / 100;
-      if (fxNodes.reverbDryGain) fxNodes.reverbDryGain.gain.value = 1 - wet;
-      if (fxNodes.reverbWetGain) fxNodes.reverbWetGain.gain.value = wet;
+      var n = getLiveNodes();
+      if (n && n.reverbDryGain) n.reverbDryGain.gain.value = 1 - wet;
+      if (n && n.reverbWetGain) n.reverbWetGain.gain.value = wet;
     });
 
   // Delay sliders
-  setupSlider(delayTimeRange, delayTimeVal,
+  setupFxSlider(delayTimeRange, delayTimeVal, 'delay', 'time',
     function(v) { return v + ' ms'; },
-    function(v) { if (fxNodes.delayNode) fxNodes.delayNode.delayTime.value = v / 1000; });
-  setupSlider(delayFbRange, delayFbVal,
+    function(v) { var n = getLiveNodes(); if (n && n.delayNode) n.delayNode.delayTime.value = v / 1000; });
+  setupFxSlider(delayFbRange, delayFbVal, 'delay', 'feedback',
     function(v) { return v + '%'; },
-    function(v) { if (fxNodes.delayFeedbackGain) fxNodes.delayFeedbackGain.gain.value = v / 100; });
-  setupSlider(delayMixRange, delayMixVal,
+    function(v) { var n = getLiveNodes(); if (n && n.delayFeedbackGain) n.delayFeedbackGain.gain.value = v / 100; });
+  setupFxSlider(delayMixRange, delayMixVal, 'delay', 'mix',
     function(v) { return v + '%'; },
     function(v) {
       var wet = v / 100;
-      if (fxNodes.delayDryGain) fxNodes.delayDryGain.gain.value = 1 - wet;
-      if (fxNodes.delayWetGain) fxNodes.delayWetGain.gain.value = wet;
+      var n = getLiveNodes();
+      if (n && n.delayDryGain) n.delayDryGain.gain.value = 1 - wet;
+      if (n && n.delayWetGain) n.delayWetGain.gain.value = wet;
     });
 
   // Distortion sliders
-  setupSlider(distortDriveRange, distortDriveVal,
+  setupFxSlider(distortDriveRange, distortDriveVal, 'distortion', 'drive',
     function(v) { return v; },
     function(v) {
-      if (fxNodes.distortShaper) fxNodes.distortShaper.curve = generateDistortionCurve(parseFloat(v));
+      var n = getLiveNodes();
+      if (n && n.distortShaper) n.distortShaper.curve = generateDistortionCurve(parseFloat(v));
     });
-  setupSlider(distortToneRange, distortToneVal,
+  setupFxSlider(distortToneRange, distortToneVal, 'distortion', 'tone',
     function(v) { return v + ' Hz'; },
-    function(v) { if (fxNodes.distortToneFilter) fxNodes.distortToneFilter.frequency.value = v; });
+    function(v) { var n = getLiveNodes(); if (n && n.distortToneFilter) n.distortToneFilter.frequency.value = v; });
 
   /* ═══════════════════════════════════════════════
-     Effects Chain — Build master bus
+     Effects Chain — Build from settings (pure)
      ═══════════════════════════════════════════════ */
 
-  function buildEffectsChain(ctx) {
-    // Reset node references
-    for (var key in fxNodes) fxNodes[key] = null;
-
-    masterGain = ctx.createGain();
-    masterGain.gain.value = 1.0;
-    var currentNode = masterGain;
+  function buildSingleEffectsChain(ctx, fxSettings) {
+    var input = ctx.createGain();
+    input.gain.value = 1.0;
+    var currentNode = input;
+    var nodes = {};
 
     // EQ: 3 BiquadFilters in series
-    if (fxEnabled.eq) {
+    if (fxSettings.eq.enabled) {
       var eqLow = ctx.createBiquadFilter();
       eqLow.type = 'lowshelf';
       eqLow.frequency.value = 320;
-      eqLow.gain.value = parseFloat(eqLowRange.value);
+      eqLow.gain.value = fxSettings.eq.low;
 
       var eqMid = ctx.createBiquadFilter();
       eqMid.type = 'peaking';
       eqMid.frequency.value = 1000;
       eqMid.Q.value = 1.0;
-      eqMid.gain.value = parseFloat(eqMidRange.value);
+      eqMid.gain.value = fxSettings.eq.mid;
 
       var eqHigh = ctx.createBiquadFilter();
       eqHigh.type = 'highshelf';
       eqHigh.frequency.value = 3200;
-      eqHigh.gain.value = parseFloat(eqHighRange.value);
+      eqHigh.gain.value = fxSettings.eq.high;
 
       currentNode.connect(eqLow);
       eqLow.connect(eqMid);
       eqMid.connect(eqHigh);
       currentNode = eqHigh;
 
-      fxNodes.eqLow = eqLow;
-      fxNodes.eqMid = eqMid;
-      fxNodes.eqHigh = eqHigh;
+      nodes.eqLow = eqLow;
+      nodes.eqMid = eqMid;
+      nodes.eqHigh = eqHigh;
     }
 
     // Compressor
-    if (fxEnabled.compressor) {
+    if (fxSettings.compressor.enabled) {
       var comp = ctx.createDynamicsCompressor();
-      comp.threshold.value = parseFloat(compThreshRange.value);
-      comp.ratio.value = parseFloat(compRatioRange.value);
-      comp.attack.value = parseFloat(compAttackRange.value) / 1000;
-      comp.release.value = parseFloat(compReleaseRange.value) / 1000;
+      comp.threshold.value = fxSettings.compressor.threshold;
+      comp.ratio.value = fxSettings.compressor.ratio;
+      comp.attack.value = fxSettings.compressor.attack / 1000;
+      comp.release.value = fxSettings.compressor.release / 1000;
       comp.knee.value = 6;
 
       currentNode.connect(comp);
       currentNode = comp;
-      fxNodes.compressor = comp;
+      nodes.compressor = comp;
     }
 
     // Distortion: WaveShaperNode + tone filter
-    if (fxEnabled.distortion) {
+    if (fxSettings.distortion.enabled) {
       var shaper = ctx.createWaveShaper();
-      shaper.curve = generateDistortionCurve(parseFloat(distortDriveRange.value));
+      shaper.curve = generateDistortionCurve(fxSettings.distortion.drive);
       shaper.oversample = '4x';
 
       var toneFilter = ctx.createBiquadFilter();
       toneFilter.type = 'lowpass';
-      toneFilter.frequency.value = parseFloat(distortToneRange.value);
+      toneFilter.frequency.value = fxSettings.distortion.tone;
       toneFilter.Q.value = 0.7;
 
       currentNode.connect(shaper);
       shaper.connect(toneFilter);
       currentNode = toneFilter;
 
-      fxNodes.distortShaper = shaper;
-      fxNodes.distortToneFilter = toneFilter;
+      nodes.distortShaper = shaper;
+      nodes.distortToneFilter = toneFilter;
     }
 
     // Delay: parallel wet/dry with feedback loop
-    if (fxEnabled.delay) {
+    if (fxSettings.delay.enabled) {
       var delayMerger = ctx.createGain();
-      var wetMix = parseFloat(delayMixRange.value) / 100;
+      var wetMix = fxSettings.delay.mix / 100;
 
       var dryGain = ctx.createGain();
       dryGain.gain.value = 1 - wetMix;
 
       var delayNode = ctx.createDelay(2.0);
-      delayNode.delayTime.value = parseFloat(delayTimeRange.value) / 1000;
+      delayNode.delayTime.value = fxSettings.delay.time / 1000;
 
       var feedbackGain = ctx.createGain();
-      feedbackGain.gain.value = parseFloat(delayFbRange.value) / 100;
+      feedbackGain.gain.value = fxSettings.delay.feedback / 100;
 
       var wetGain = ctx.createGain();
       wetGain.gain.value = wetMix;
@@ -1165,22 +1466,22 @@
       wetGain.connect(delayMerger);
       currentNode = delayMerger;
 
-      fxNodes.delayNode = delayNode;
-      fxNodes.delayFeedbackGain = feedbackGain;
-      fxNodes.delayDryGain = dryGain;
-      fxNodes.delayWetGain = wetGain;
+      nodes.delayNode = delayNode;
+      nodes.delayFeedbackGain = feedbackGain;
+      nodes.delayDryGain = dryGain;
+      nodes.delayWetGain = wetGain;
     }
 
     // Reverb: ConvolverNode with wet/dry mix
-    if (fxEnabled.reverb) {
+    if (fxSettings.reverb.enabled) {
       var reverbMerger = ctx.createGain();
-      var wetMixR = parseFloat(reverbMixRange.value) / 100;
+      var wetMixR = fxSettings.reverb.mix / 100;
 
       var dryGainR = ctx.createGain();
       dryGainR.gain.value = 1 - wetMixR;
 
       var convolver = ctx.createConvolver();
-      convolver.buffer = generateReverbIR(ctx, parseFloat(reverbDecayRange.value));
+      convolver.buffer = generateReverbIR(ctx, fxSettings.reverb.decay);
 
       var wetGainR = ctx.createGain();
       wetGainR.gain.value = wetMixR;
@@ -1192,12 +1493,32 @@
       wetGainR.connect(reverbMerger);
       currentNode = reverbMerger;
 
-      fxNodes.reverbConvolver = convolver;
-      fxNodes.reverbDryGain = dryGainR;
-      fxNodes.reverbWetGain = wetGainR;
+      nodes.reverbConvolver = convolver;
+      nodes.reverbDryGain = dryGainR;
+      nodes.reverbWetGain = wetGainR;
     }
 
-    currentNode.connect(ctx.destination);
+    return { input: input, output: currentNode, nodes: nodes };
+  }
+
+  /**
+   * Build the master bus effects chain.
+   * Returns masterGain (entry point for all tracks).
+   */
+  function buildEffectsChain(ctx) {
+    activeFxChains = {};
+    fxNodes = {};
+
+    masterGain = ctx.createGain();
+    masterGain.gain.value = 1.0;
+
+    var masterChain = buildSingleEffectsChain(ctx, masterFxSettings);
+    masterGain.connect(masterChain.input);
+    masterChain.output.connect(ctx.destination);
+
+    activeFxChains.master = masterChain;
+    fxNodes = masterChain.nodes;
+
     return masterGain;
   }
 
@@ -1213,9 +1534,11 @@
       }
       trackSlots[i].gainNode = null;
       trackSlots[i].panNode = null;
+      trackSlots[i].fxChainNodes = null;
     }
     masterGain = null;
-    for (var key in fxNodes) fxNodes[key] = null;
+    activeFxChains = {};
+    fxNodes = {};
     if (playCtx) {
       playCtx.close();
       playCtx = null;
@@ -1235,9 +1558,9 @@
 
     playCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-    var startTimeSec = playheadRatio * totalDuration;
+    var playheadTimeSec = playheadRatio * totalDuration;
     var endTimeSec = trimEndRatio * totalDuration;
-    var playDuration = endTimeSec - startTimeSec;
+    var playDuration = endTimeSec - playheadTimeSec;
     if (playDuration <= 0) return;
 
     // Build master bus effects chain
@@ -1259,15 +1582,33 @@
 
       source.connect(gain);
       gain.connect(panner);
-      panner.connect(chainInput);
+
+      // Per-track effects chain
+      if (hasAnyFx(slot.fx)) {
+        var trackChain = buildSingleEffectsChain(playCtx, slot.fx);
+        panner.connect(trackChain.input);
+        trackChain.output.connect(chainInput);
+        activeFxChains[slot.id] = trackChain;
+        slot.fxChainNodes = trackChain;
+      } else {
+        panner.connect(chainInput);
+      }
 
       slot.sourceNode = source;
       slot.gainNode = gain;
       slot.panNode = panner;
 
-      if (startTimeSec < lf.buffer.duration) {
-        var trackPlayDuration = Math.min(playDuration, lf.buffer.duration - startTimeSec);
-        source.start(0, startTimeSec, trackPlayDuration);
+      // Offset-aware playback
+      var effDur = effectiveDuration(slot);
+      var trackEndOnTimeline = slot.startOffset + effDur;
+      if (playheadTimeSec < trackEndOnTimeline && effDur > 0) {
+        var timeIntoTrack = Math.max(0, playheadTimeSec - slot.startOffset);
+        var bufferOffset = (slot.clipStart || 0) + timeIntoTrack;
+        var ctxStartTime = Math.max(0, slot.startOffset - playheadTimeSec);
+        var playLen = Math.min(effDur - timeIntoTrack, playDuration - ctxStartTime);
+        if (playLen > 0) {
+          source.start(ctxStartTime, bufferOffset, playLen);
+        }
       }
     }
 
@@ -1347,14 +1688,18 @@
         return;
       }
 
-      // Extra tail time for reverb/delay decay
+      // Extra tail time for reverb/delay decay (check master AND per-track)
       var tailSec = 0;
-      if (fxEnabled.reverb) tailSec = Math.max(tailSec, parseFloat(reverbDecayRange.value));
-      if (fxEnabled.delay) {
-        var fb = parseFloat(delayFbRange.value) / 100;
-        var dt = parseFloat(delayTimeRange.value) / 1000;
-        if (fb > 0 && dt > 0) tailSec = Math.max(tailSec, dt * Math.min(10, 1 / (1 - fb)));
+      function checkTail(fx) {
+        if (fx.reverb.enabled) tailSec = Math.max(tailSec, fx.reverb.decay);
+        if (fx.delay.enabled) {
+          var fb = fx.delay.feedback / 100;
+          var dt = fx.delay.time / 1000;
+          if (fb > 0 && dt > 0) tailSec = Math.max(tailSec, dt * Math.min(10, 1 / (1 - fb)));
+        }
       }
+      checkTail(masterFxSettings);
+      for (var t = 0; t < assigned.length; t++) checkTail(assigned[t].fx);
 
       var renderDurationSec = outputDurationSec + tailSec;
       var renderLength = Math.ceil(renderDurationSec * sampleRate);
@@ -1365,7 +1710,7 @@
       var offCtx = new OfflineAudioContext(numChannels, renderLength, sampleRate);
       var chainInput = buildEffectsChain(offCtx);
 
-      // Per-track sources
+      // Per-track sources with offset-aware timing
       for (var i = 0; i < assigned.length; i++) {
         var slot = assigned[i];
         var lf = getLibFile(slot.assignedFileId);
@@ -1382,11 +1727,27 @@
 
         source.connect(gain);
         gain.connect(panner);
-        panner.connect(chainInput);
 
-        var trackAvailDur = Math.max(0, lf.buffer.duration - trimStartSec);
-        if (trackAvailDur > 0) {
-          source.start(0, trimStartSec, Math.min(outputDurationSec, trackAvailDur));
+        // Per-track effects chain for export
+        if (hasAnyFx(slot.fx)) {
+          var trackChain = buildSingleEffectsChain(offCtx, slot.fx);
+          panner.connect(trackChain.input);
+          trackChain.output.connect(chainInput);
+        } else {
+          panner.connect(chainInput);
+        }
+
+        // Offset-aware source start
+        var effDur = effectiveDuration(slot);
+        var trackEndOnTimeline = slot.startOffset + effDur;
+        if (trimStartSec < trackEndOnTimeline && effDur > 0) {
+          var timeIntoTrack = Math.max(0, trimStartSec - slot.startOffset);
+          var bufferOffset = (slot.clipStart || 0) + timeIntoTrack;
+          var ctxStartTime = Math.max(0, slot.startOffset - trimStartSec);
+          var playLen = Math.min(effDur - timeIntoTrack, outputDurationSec - ctxStartTime);
+          if (playLen > 0) {
+            source.start(ctxStartTime, bufferOffset, playLen);
+          }
         }
       }
 
@@ -1430,9 +1791,9 @@
       // Clamp
       var encL = outLeft.subarray(0, encodeSamples);
       var encR = outRight.subarray(0, encodeSamples);
-      for (var i = 0; i < encodeSamples; i++) {
-        if (encL[i] > 1) encL[i] = 1; else if (encL[i] < -1) encL[i] = -1;
-        if (encR[i] > 1) encR[i] = 1; else if (encR[i] < -1) encR[i] = -1;
+      for (var ci = 0; ci < encodeSamples; ci++) {
+        if (encL[ci] > 1) encL[ci] = 1; else if (encL[ci] < -1) encL[ci] = -1;
+        if (encR[ci] > 1) encR[ci] = 1; else if (encR[ci] < -1) encR[ci] = -1;
       }
 
       var channels = [encL, encR];
@@ -1466,7 +1827,8 @@
       showError(errorBox, 'Export failed: ' + err.message);
     } finally {
       masterGain = null;
-      for (var key in fxNodes) fxNodes[key] = null;
+      activeFxChains = {};
+      fxNodes = {};
       exportBtn.disabled = false;
       exportBtn.textContent = 'Export Mixed MP3';
       setTimeout(function() { progressWrap.classList.remove('active'); }, 1500);
@@ -1503,6 +1865,7 @@
     resizeTimer = setTimeout(function() {
       if (getAssignedSlots().length > 0) {
         drawAllWaveforms();
+        updateAllOverlays();
         updateTrimUI();
         updatePlayheadUI();
       }
@@ -1514,4 +1877,6 @@
   /* ── Initial state ── */
   updateTrackCount();
   rebuildLibraryUI();
+  rebuildFxTargetPills();
+  syncFxUI();
 })();

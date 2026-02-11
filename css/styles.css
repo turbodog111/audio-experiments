@@ -1244,6 +1244,348 @@ body.drag-in-progress .track-drop-zone .drop-zone-text {
 }
 
 /* ═══════════════════════════════════════════════
+   FX Target Selector
+   ═══════════════════════════════════════════════ */
+
+.fx-target-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.fx-target-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.fx-target-pills {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.fx-target-pill {
+  padding: 5px 12px;
+  border: 1px solid var(--border-medium);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  width: auto;
+  margin: 0;
+}
+
+.fx-target-pill:hover {
+  border-color: var(--accent-blue);
+  color: var(--text-primary);
+}
+
+.fx-target-pill.active {
+  border-color: var(--accent-green);
+  background: var(--accent-green-glow);
+  color: var(--accent-green);
+}
+
+.fx-target-pill[data-target]:not([data-target="master"]) {
+  border-left: 3px solid var(--pill-color, var(--text-dimmed));
+}
+
+/* ═══════════════════════════════════════════════
+   FX Badges on Track Rows
+   ═══════════════════════════════════════════════ */
+
+.track-fx-badges {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.fx-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--badge-color, var(--text-muted));
+  border: 1px solid var(--badge-color, var(--border-subtle));
+}
+
+.track-offset-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--accent-blue);
+  margin-left: 8px;
+  opacity: 0.8;
+}
+
+/* ═══════════════════════════════════════════════
+   Timeline Track Block Overlays & Clip Handles
+   ═══════════════════════════════════════════════ */
+
+.track-block-overlay {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  cursor: grab;
+  z-index: 3;
+  border-radius: 2px;
+  background: transparent;
+  border: 1px solid transparent;
+  transition: border-color var(--transition-fast);
+}
+
+.track-block-overlay:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.track-block-overlay.dragging {
+  cursor: grabbing;
+  border-color: var(--accent-green);
+  background: rgba(78, 204, 163, 0.05);
+}
+
+.track-clip-handle {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 4;
+}
+
+.track-clip-handle-left {
+  left: -4px;
+}
+
+.track-clip-handle-right {
+  right: -4px;
+}
+
+.track-clip-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  border-radius: 1px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.track-clip-handle-left::after {
+  left: 3px;
+  background: var(--accent-blue);
+}
+
+.track-clip-handle-right::after {
+  right: 3px;
+  background: var(--accent-blue);
+}
+
+.track-clip-handle:hover::after,
+.track-clip-handle.active::after {
+  opacity: 1;
+}
+
+/* ═══════════════════════════════════════════════
+   Help Guide Sidebar
+   ═══════════════════════════════════════════════ */
+
+.guide-toggle-btn {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-medium);
+  border-radius: 50%;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  z-index: 1000;
+  transition: all var(--transition-fast);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+}
+
+.guide-toggle-btn:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+.guide-toggle-btn.active {
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+  background: var(--accent-green-glow);
+}
+
+.guide-sidebar {
+  position: fixed;
+  top: 0;
+  right: -340px;
+  width: 330px;
+  height: 100vh;
+  background: var(--bg-card);
+  border-left: 1px solid var(--border-subtle);
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.4);
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  transition: right 0.3s ease;
+  overflow: hidden;
+}
+
+.guide-sidebar.open {
+  right: 0;
+}
+
+.guide-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.guide-header h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.guide-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.3rem;
+  padding: 0 4px;
+  width: auto;
+  margin: 0;
+  line-height: 1;
+  transition: color var(--transition-fast);
+}
+
+.guide-close-btn:hover {
+  color: var(--accent-primary);
+}
+
+.guide-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-medium) transparent;
+}
+
+.guide-content::-webkit-scrollbar { width: 4px; }
+.guide-content::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 2px;
+}
+
+.guide-section {
+  margin-bottom: 28px;
+  padding: 16px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-normal);
+}
+
+.guide-section.guide-section-highlighted {
+  border-color: var(--accent-green);
+  background: var(--accent-green-glow);
+}
+
+.guide-section h4 {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+  margin: 0 0 12px 0;
+}
+
+.guide-section ol,
+.guide-section ul {
+  padding-left: 20px;
+  margin: 0;
+}
+
+.guide-section li {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 6px;
+}
+
+.guide-section li strong {
+  color: var(--text-primary);
+}
+
+.guide-shortcuts-list {
+  list-style: none;
+  padding-left: 0 !important;
+}
+
+.guide-shortcuts-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.guide-shortcuts-list kbd {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--bg-deepest);
+  border: 1px solid var(--border-medium);
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  min-width: 40px;
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .guide-sidebar {
+    width: 280px;
+    right: -290px;
+  }
+  .guide-toggle-btn {
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+  }
+}
+
+/* ═══════════════════════════════════════════════
    Stem Separator
    ═══════════════════════════════════════════════ */
 
