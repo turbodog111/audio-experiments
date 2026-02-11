@@ -976,13 +976,36 @@ body.drag-in-progress .track-drop-zone .drop-zone-text {
   scrollbar-color: var(--border-medium) transparent;
 }
 
-.waveform-container::-webkit-scrollbar { height: 6px; }
+.waveform-container::-webkit-scrollbar { height: 3px; }
 .waveform-container::-webkit-scrollbar-thumb {
   background: var(--border-medium);
   border-radius: 3px;
 }
 .waveform-container::-webkit-scrollbar-track {
   background: transparent;
+}
+
+.timeline-bookmark {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: #ffa726;
+  z-index: 8;
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 0.8;
+}
+.timeline-bookmark:hover { opacity: 1; }
+.timeline-bookmark-label {
+  position: absolute;
+  top: 0;
+  left: 4px;
+  font-size: 0.65rem;
+  color: #ffa726;
+  white-space: nowrap;
+  pointer-events: none;
+  font-family: 'JetBrains Mono', monospace;
 }
 
 .waveform-inner {

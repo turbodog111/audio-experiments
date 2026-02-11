@@ -29,6 +29,8 @@
   var trimDurEl       = document.getElementById('ed-trimDuration');
   var playToggle      = document.getElementById('ed-playToggle');
   var resetBtn        = document.getElementById('ed-resetBtn');
+  var trimAllSilBtn   = document.getElementById('ed-trimAllSilence');
+  var addBookmarkBtn  = document.getElementById('ed-addBookmark');
   var fadeToggle      = document.getElementById('ed-fadeToggle');
   var fadeControls    = document.getElementById('ed-fadeControls');
   var fadeInRange     = document.getElementById('ed-fadeIn');
@@ -119,6 +121,11 @@
   /* ── Zoom state ── */
   var pixelsPerSecond = 100;
 
+  /* ── Bookmark state ── */
+  var bookmarks = [];
+  var nextBookmarkId = 0;
+  var bookmarkEls = [];
+
   /* ── Drag state ── */
   var draggedFileId = null;
 
@@ -183,6 +190,24 @@
     var start = slot.clipStart || 0;
     var end = slot.clipEnd !== null ? Math.min(slot.clipEnd, full) : full;
     return Math.max(0, end - start);
+  }
+
+  function detectSilenceEnd(buffer, threshold) {
+    var data = buffer.getChannelData(0);
+    var sr = buffer.sampleRate;
+    var windowSize = Math.floor(sr * 0.005); // 5ms window
+    threshold = threshold || 0.01;
+    for (var i = 0; i < data.length - windowSize; i += windowSize) {
+      var sum = 0;
+      for (var j = 0; j < windowSize; j++) {
+        sum += data[i + j] * data[i + j];
+      }
+      var rms = Math.sqrt(sum / windowSize);
+      if (rms > threshold) {
+        return Math.max(0, (i / sr) - 0.005);
+      }
+    }
+    return 0;
   }
 
   function getActiveFxSettings() {
@@ -838,6 +863,25 @@
             muteBtn.title = 'Add a silence region to this track';
             muteBtn.addEventListener('click', function() { addSilenceRegion(theSlot); });
             infoBar.appendChild(muteBtn);
+
+            var trimSilBtn = document.createElement('button');
+            trimSilBtn.className = 'track-mute-region-btn';
+            trimSilBtn.textContent = 'Trim Silence';
+            trimSilBtn.title = 'Auto-trim leading silence from this track';
+            trimSilBtn.addEventListener('click', function() {
+              var lf2 = getLibFile(theSlot.assignedFileId);
+              if (!lf2) return;
+              var silenceEnd = detectSilenceEnd(lf2.buffer);
+              if (silenceEnd > 0.01) {
+                theSlot.clipStart = silenceEnd;
+                recalcDuration();
+                buildWaveformLanes();
+                drawAllWaveforms();
+                updateTrimUI();
+                rebuildTracksUI();
+              }
+            });
+            infoBar.appendChild(trimSilBtn);
           })(slot);
 
           // Silence region editable rows
@@ -1145,6 +1189,7 @@
     waveformLanes.style.width = timelineW + 'px';
 
     updateAllOverlays();
+    renderBookmarks();
   }
 
   function updateAllOverlays() {
@@ -1180,8 +1225,9 @@
         var dx = ev.clientX - startX;
         var dtSec = dx / pixelsPerSecond;
         var newOffset = origOffset + dtSec;
-        // Snap to 0.01s unless Shift held
+        // Snap to 0.01s unless Shift held, then snap to bookmarks
         if (!ev.shiftKey) newOffset = Math.round(newOffset * 100) / 100;
+        if (!ev.shiftKey) newOffset = snapToBookmark(newOffset);
         slot.startOffset = Math.max(0, newOffset);
         recalcDuration();
         var tw = getTimelineWidth() + 'px';
@@ -1211,6 +1257,7 @@
         ev.preventDefault();
         var rect = lane.getBoundingClientRect();
         var timelineSec = (ev.clientX - rect.left) / pixelsPerSecond;
+        if (!ev.shiftKey) timelineSec = snapToBookmark(timelineSec);
         var newClipEnd = timelineSec - slot.startOffset + (slot.clipStart || 0);
         if (!ev.shiftKey) newClipEnd = Math.round(newClipEnd * 100) / 100;
         newClipEnd = Math.max((slot.clipStart || 0) + 0.1, Math.min(newClipEnd, lf.buffer.duration));
@@ -1246,6 +1293,7 @@
         var rect = lane.getBoundingClientRect();
         var timelineSec = (ev.clientX - rect.left) / pixelsPerSecond;
         if (!ev.shiftKey) timelineSec = Math.round(timelineSec * 100) / 100;
+        if (!ev.shiftKey) timelineSec = snapToBookmark(timelineSec);
         timelineSec = Math.max(0, Math.min(timelineSec, rightEdgeTime - 0.1));
         var delta = timelineSec - origStartOffset;
         slot.startOffset = timelineSec;
@@ -1291,6 +1339,7 @@
         var dt = dx / pixelsPerSecond;
         var ns = origStart + dt;
         if (!ev.shiftKey) ns = Math.round(ns * 100) / 100;
+        if (!ev.shiftKey) ns = snapToBookmark(ns);
         ns = Math.max(0, Math.min(ns, (totalDuration || 1) - w));
         region.start = ns;
         region.end = ns + w;
@@ -1314,6 +1363,7 @@
         var rect = lane.getBoundingClientRect();
         var ts = (ev.clientX - rect.left) / pixelsPerSecond;
         if (!ev.shiftKey) ts = Math.round(ts * 100) / 100;
+        if (!ev.shiftKey) ts = snapToBookmark(ts);
         region.start = Math.max(0, Math.min(ts, region.end - MIN_W));
         updateAllOverlays();
       };
@@ -1336,6 +1386,7 @@
         var rect = lane.getBoundingClientRect();
         var ts = (ev.clientX - rect.left) / pixelsPerSecond;
         if (!ev.shiftKey) ts = Math.round(ts * 100) / 100;
+        if (!ev.shiftKey) ts = snapToBookmark(ts);
         region.end = Math.max(region.start + MIN_W, Math.min(ts, totalDuration || 1));
         updateAllOverlays();
       };
@@ -1493,6 +1544,39 @@
     updateTrimUI();
   });
 
+  trimAllSilBtn.addEventListener('click', function() {
+    var assigned = getAssignedSlots();
+    if (assigned.length === 0) return;
+    var changed = false;
+    for (var i = 0; i < assigned.length; i++) {
+      var lf = getLibFile(assigned[i].assignedFileId);
+      if (!lf) continue;
+      var silenceEnd = detectSilenceEnd(lf.buffer);
+      if (silenceEnd > 0.01) {
+        assigned[i].clipStart = silenceEnd;
+        changed = true;
+      }
+    }
+    if (changed) {
+      recalcDuration();
+      buildWaveformLanes();
+      drawAllWaveforms();
+      updateTrimUI();
+      rebuildTracksUI();
+    }
+  });
+
+  addBookmarkBtn.addEventListener('click', function() {
+    if (totalDuration <= 0 || getAssignedSlots().length === 0) return;
+    var timeSec = playheadRatio * totalDuration;
+    for (var i = 0; i < bookmarks.length; i++) {
+      if (Math.abs(bookmarks[i].time - timeSec) < 0.05) return;
+    }
+    bookmarks.push({ id: nextBookmarkId++, time: timeSec });
+    bookmarks.sort(function(a, b) { return a.time - b.time; });
+    renderBookmarks();
+  });
+
   /* ═══════════════════════════════════════════════
      Playhead — click-to-seek & drag
      ═══════════════════════════════════════════════ */
@@ -1500,6 +1584,48 @@
   function updatePlayheadUI() {
     var timelineW = getTimelineWidth();
     playheadEl.style.left = (playheadRatio * timelineW) + 'px';
+  }
+
+  /* ── Bookmarks ── */
+
+  function renderBookmarks() {
+    for (var i = 0; i < bookmarkEls.length; i++) {
+      if (bookmarkEls[i].parentNode) bookmarkEls[i].parentNode.removeChild(bookmarkEls[i]);
+    }
+    bookmarkEls = [];
+    for (var i = 0; i < bookmarks.length; i++) {
+      var marker = document.createElement('div');
+      marker.className = 'timeline-bookmark';
+      marker.style.left = (bookmarks[i].time * pixelsPerSecond) + 'px';
+      marker.title = 'Bookmark: ' + fmtTime(bookmarks[i].time) + ' (double-click to remove)';
+
+      var label = document.createElement('span');
+      label.className = 'timeline-bookmark-label';
+      label.textContent = fmtTime(bookmarks[i].time);
+      marker.appendChild(label);
+
+      waveformInner.appendChild(marker);
+      bookmarkEls.push(marker);
+
+      (function(bm) {
+        marker.addEventListener('dblclick', function(e) {
+          e.stopPropagation();
+          bookmarks = bookmarks.filter(function(b) { return b.id !== bm.id; });
+          renderBookmarks();
+        });
+      })(bookmarks[i]);
+    }
+  }
+
+  function snapToBookmark(timeSec) {
+    var snapPx = 8;
+    var snapSec = snapPx / pixelsPerSecond;
+    for (var i = 0; i < bookmarks.length; i++) {
+      if (Math.abs(bookmarks[i].time - timeSec) < snapSec) {
+        return bookmarks[i].time;
+      }
+    }
+    return timeSec;
   }
 
   function seekTo(ratio) {
@@ -2217,6 +2343,7 @@
     updateAllOverlays();
     updateTrimUI();
     updatePlayheadUI();
+    renderBookmarks();
   }
 
   function setZoom(val) {
