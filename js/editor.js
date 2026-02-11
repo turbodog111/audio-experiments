@@ -348,13 +348,16 @@
       try {
         var arrayBuf = await file.arrayBuffer();
         var buffer = await actx.decodeAudioData(arrayBuf);
+        var fileAnalysis = null;
+        try { fileAnalysis = analyzeAudio(buffer); } catch (_) {}
         libraryFiles.push({
           id: nextFileId++,
           file: file,
           buffer: buffer,
           name: file.name,
           duration: buffer.duration,
-          size: file.size
+          size: file.size,
+          analysis: fileAnalysis
         });
         added++;
       } catch (err) {
@@ -437,7 +440,11 @@
 
         var meta = document.createElement('div');
         meta.className = 'file-panel-meta';
-        meta.textContent = fmtTime(lf.duration) + ' \u2022 ' + formatSize(lf.size);
+        var metaText = fmtTime(lf.duration) + ' \u2022 ' + formatSize(lf.size);
+        if (lf.analysis) {
+          metaText += ' \u2022 ' + lf.analysis.bpm + ' BPM \u2022 ' + lf.analysis.keyFull;
+        }
+        meta.textContent = metaText;
         info.appendChild(meta);
 
         item.appendChild(info);
@@ -691,7 +698,11 @@
 
           var nameEl = document.createElement('span');
           nameEl.className = 'track-name';
-          nameEl.textContent = lf.name.replace(/\.mp3$/i, '');
+          var trackLabel = lf.name.replace(/\.mp3$/i, '');
+          if (lf.analysis) {
+            trackLabel += '  \u2014  ' + lf.analysis.bpm + ' BPM \u2022 ' + lf.analysis.keyFull;
+          }
+          nameEl.textContent = trackLabel;
           nameEl.title = lf.name;
           infoBar.appendChild(nameEl);
 

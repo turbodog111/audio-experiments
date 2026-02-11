@@ -1716,6 +1716,68 @@ button.action-btn.separator-btn:hover:not(:disabled) {
    AI Music Generator
    ═══════════════════════════════════════════════ */
 
+.musicgen-token-section {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.musicgen-token-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.musicgen-token-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  background: var(--bg-deepest);
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+  transition: border-color var(--transition-fast);
+}
+
+.musicgen-token-input:focus {
+  outline: none;
+  border-color: var(--accent-purple);
+}
+
+.musicgen-token-input::placeholder {
+  color: var(--text-dimmed);
+}
+
+.musicgen-token-save {
+  padding: 8px 16px;
+  border: 1px solid var(--accent-green);
+  border-radius: var(--radius-sm);
+  background: var(--accent-green-glow);
+  color: var(--accent-green);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  width: auto;
+  margin: 0;
+}
+
+.musicgen-token-save:hover {
+  background: var(--accent-green);
+  color: var(--bg-deepest);
+}
+
+.musicgen-token-status {
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .musicgen-form {
   margin-bottom: 20px;
 }

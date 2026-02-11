@@ -1,11 +1,14 @@
 /* ═══════════════════════════════════════════════
-   AI Music Generator (MusicGen via Hugging Face)
+   AI Music Generator (MusicGen via HF Inference API)
    ─────────────────────────────────────────────
-   Uses the Gradio JS client to call the
-   Surn/UnlimitedMusicGen HF Space, which runs
-   Meta's MusicGen model on a T4 GPU.
+   Uses the Hugging Face Inference API directly
+   to call Meta's MusicGen model. Requires a free
+   HF API token (get one at huggingface.co/settings/tokens).
    ═══════════════════════════════════════════════ */
 (function musicgenModule() {
+  const tokenInput     = document.getElementById('mg-token');
+  const saveTokenBtn   = document.getElementById('mg-saveToken');
+  const tokenStatus    = document.getElementById('mg-tokenStatus');
   const promptInput    = document.getElementById('mg-prompt');
   const modelSelect    = document.getElementById('mg-model');
   const durationRange  = document.getElementById('mg-duration');
@@ -23,7 +26,8 @@
   const resultInfo     = document.getElementById('mg-resultInfo');
   const audioPreview   = document.getElementById('mg-audioPreview');
 
-  let gradioReady = false;
+  const STORAGE_KEY = 'mp3master_hf_token';
+  const API_BASE = 'https://router.huggingface.co/hf-inference/models/';
 
   function sp(pct, text) { setProgress(progressFill, progressTextEl, pct, text); }
 
@@ -37,34 +41,63 @@
     statusEl.style.display = 'none';
   }
 
+  /* ── Token management ── */
+
+  function getToken() {
+    return (tokenInput.value || '').trim() || localStorage.getItem(STORAGE_KEY) || '';
+  }
+
+  function refreshTokenUI() {
+    var saved = localStorage.getItem(STORAGE_KEY) || '';
+    if (saved) {
+      tokenInput.value = saved;
+      tokenInput.placeholder = 'Token saved';
+      tokenStatus.textContent = 'Token saved';
+      tokenStatus.style.color = 'var(--accent-green)';
+      generateBtn.disabled = false;
+      generateBtn.textContent = 'Generate Music';
+    } else {
+      tokenStatus.textContent = '';
+      generateBtn.disabled = true;
+      generateBtn.textContent = 'Enter HF token above first';
+    }
+  }
+
+  saveTokenBtn.addEventListener('click', () => {
+    var token = (tokenInput.value || '').trim();
+    if (!token) {
+      tokenStatus.textContent = 'Please enter a token';
+      tokenStatus.style.color = 'var(--accent-primary)';
+      return;
+    }
+    localStorage.setItem(STORAGE_KEY, token);
+    tokenStatus.textContent = 'Token saved!';
+    tokenStatus.style.color = 'var(--accent-green)';
+    generateBtn.disabled = false;
+    generateBtn.textContent = 'Generate Music';
+  });
+
+  tokenInput.addEventListener('input', () => {
+    var token = (tokenInput.value || '').trim();
+    if (token) {
+      generateBtn.disabled = false;
+      generateBtn.textContent = 'Generate Music';
+    }
+  });
+
   // Duration slider feedback
   durationRange.addEventListener('input', function() {
     durationVal.textContent = durationRange.value + 's';
   });
 
-  // Gradio client ready
-  window.addEventListener('gradio-ready', () => {
-    gradioReady = true;
-    generateBtn.disabled = false;
-    generateBtn.textContent = 'Generate Music';
-  });
+  // Init
+  refreshTokenUI();
 
-  // If Gradio was already loaded before this script ran
-  if (window._GradioClient) {
-    gradioReady = true;
-    generateBtn.disabled = false;
-    generateBtn.textContent = 'Generate Music';
-  }
-
-  /**
-   * Extract a usable URL from a Gradio result item.
-   */
-  function extractUrl(item) {
-    if (typeof item === 'string') return item;
-    if (item && item.url) return item.url;
-    if (item && item.path) return item.path;
-    if (item && item.data) return item.data;
-    return null;
+  /* ── Map duration to max_new_tokens ── */
+  // MusicGen generates at 50 tokens/sec for the small/medium models
+  // and uses a 32kHz sample rate. ~50 tokens = 1 second of audio.
+  function durationToTokens(seconds) {
+    return Math.round(seconds * 50);
   }
 
   generateBtn.addEventListener('click', async () => {
@@ -74,19 +107,15 @@
       return;
     }
 
-    if (!gradioReady) {
-      showError(errorBox, 'Gradio client not loaded. Ensure you are serving this page over HTTP (not file://).');
-      return;
-    }
-
-    var GradioClient = window._GradioClient;
-    if (!GradioClient) {
-      showError(errorBox, 'Gradio client not available.');
+    var token = getToken();
+    if (!token) {
+      showError(errorBox, 'Please enter your Hugging Face API token above. Get a free one at huggingface.co/settings/tokens');
       return;
     }
 
     var model = modelSelect.value;
     var duration = parseInt(durationRange.value) || 10;
+    var maxTokens = durationToTokens(duration);
 
     generateBtn.disabled = true;
     generateBtn.textContent = 'Generating...';
@@ -95,83 +124,81 @@
     progressWrap.classList.add('active');
 
     try {
-      // Step 1: Connect
-      updateStatus('connecting', 'Connecting to AI service...');
-      sp(5, 'Connecting to Hugging Face...');
+      updateStatus('connecting', 'Sending request to HF Inference API...');
+      sp(10, 'Generating ' + duration + 's of music (this may take 30\u2013120 seconds)...');
 
-      var client;
-      try {
-        client = await GradioClient.connect("Surn/UnlimitedMusicGen");
-      } catch (connErr) {
-        updateStatus('connecting', 'Waking up AI service (this may take a minute)...');
-        sp(10, 'Waiting for AI service to wake up...');
-        await new Promise(r => setTimeout(r, 8000));
-        client = await GradioClient.connect("Surn/UnlimitedMusicGen");
+      var apiUrl = API_BASE + model;
+
+      var response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          inputs: prompt,
+          parameters: {
+            max_new_tokens: maxTokens,
+            do_sample: true,
+            guidance_scale: 3
+          }
+        })
+      });
+
+      if (response.status === 401 || response.status === 403) {
+        throw new Error('Invalid or expired HF token. Please check your token at huggingface.co/settings/tokens');
       }
 
-      // Step 2: Generate
-      updateStatus('uploading', 'Generating music with MusicGen AI...');
-      sp(20, 'Generating ' + duration + 's of music (this may take 30\u2013120 seconds)...');
+      if (response.status === 503) {
+        // Model is loading
+        updateStatus('connecting', 'Model is loading on HF servers (this can take 1\u20132 minutes)...');
+        sp(15, 'Waiting for model to load...');
 
-      var result = await client.predict("/predict_simple", [
-        model,             // model
-        prompt,            // text description
-        null,              // melody_filepath (no melody conditioning)
-        duration,          // duration in seconds
-        2,                 // dimension
-        200,               // topk
-        0.01,              // topp
-        1.0,               // temperature
-        4.0,               // cfg_coef
-        "./assets/background.png",  // background
-        "AI Generated",    // title
-        "./assets/arial.ttf",       // settings_font
-        "#c87f05",         // settings_font_color
-        -1,                // seed (-1 for random)
-        1,                 // overlap
-        -1,                // prompt_index
-        false,             // include_title
-        false,             // include_settings
-        false,             // harmony_only
-        "anonymous",       // profile
-        30,                // segment_length
-        28,                // settings_font_size
-        false,             // settings_animate_waveform
-        "Landscape",       // video_orientation
-        false              // return_history_json
-      ]);
+        // Wait and retry
+        await new Promise(r => setTimeout(r, 30000));
 
-      sp(80, 'Receiving generated audio...');
-
-      // Result: [video_path, audio_path, seed_used]
-      // Try to extract audio (index 1) first, fallback to video (index 0)
-      var audioUrl = null;
-      if (result.data && result.data.length > 1) {
-        audioUrl = extractUrl(result.data[1]);
-      }
-      if (!audioUrl && result.data && result.data.length > 0) {
-        audioUrl = extractUrl(result.data[0]);
+        response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            inputs: prompt,
+            parameters: {
+              max_new_tokens: maxTokens,
+              do_sample: true,
+              guidance_scale: 3
+            }
+          })
+        });
       }
 
-      if (!audioUrl) {
-        throw new Error('No audio returned from AI service. The service may be experiencing issues.');
+      if (!response.ok) {
+        var errBody = '';
+        try { errBody = await response.text(); } catch(_) {}
+        throw new Error('HF API returned ' + response.status + ': ' + (errBody || response.statusText));
       }
 
-      // Step 3: Download
-      updateStatus('downloading', 'Downloading generated audio...');
-      sp(85, 'Downloading audio...');
+      updateStatus('downloading', 'Receiving generated audio...');
+      sp(80, 'Downloading generated audio...');
 
-      var response = await fetch(audioUrl);
       var blob = await response.blob();
+
+      if (blob.size < 1000) {
+        // Likely an error response in text form
+        var text = await blob.text();
+        throw new Error('Unexpected response: ' + text.substring(0, 200));
+      }
+
       var objUrl = URL.createObjectURL(blob);
 
-      // Determine extension
+      // Determine extension from content-type
       var ct = response.headers.get('content-type') || '';
-      var ext = '.wav';
-      if (ct.includes('mpeg') || ct.includes('mp3')) ext = '.mp3';
-      else if (ct.includes('flac')) ext = '.flac';
-      else if (audioUrl.includes('.mp3')) ext = '.mp3';
-      else if (audioUrl.includes('.flac')) ext = '.flac';
+      var ext = '.flac'; // HF Inference API typically returns FLAC
+      if (ct.includes('wav')) ext = '.wav';
+      else if (ct.includes('mpeg') || ct.includes('mp3')) ext = '.mp3';
+      else if (ct.includes('ogg')) ext = '.ogg';
 
       // Set up preview and download
       audioPreview.src = objUrl;
@@ -181,7 +208,7 @@
       dlLink.download = fileName;
 
       resultInfo.textContent = fileName + ' \u2014 ' + formatSize(blob.size) +
-        ' \u2014 ' + duration + 's \u2014 Model: ' + model;
+        ' \u2014 ~' + duration + 's \u2014 Model: ' + model.replace('facebook/musicgen-', '');
 
       sp(100, 'Done!');
       updateStatus('done', 'Music generated successfully!');
