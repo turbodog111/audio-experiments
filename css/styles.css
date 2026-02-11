@@ -1916,6 +1916,175 @@ button.action-btn.musicgen-btn:hover:not(:disabled) {
 }
 
 /* ═══════════════════════════════════════════════
+   Silence Region Overlays
+   ═══════════════════════════════════════════════ */
+
+.silence-region-overlay {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: rgba(233, 69, 96, 0.25);
+  border-left: 2px solid var(--accent-primary);
+  border-right: 2px solid var(--accent-primary);
+  z-index: 5;
+  cursor: move;
+  transition: background var(--transition-fast);
+}
+
+.silence-region-overlay:hover {
+  background: rgba(233, 69, 96, 0.38);
+}
+
+.silence-region-delete {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  background: var(--accent-primary);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  z-index: 6;
+  padding: 0;
+}
+
+.silence-region-overlay:hover .silence-region-delete {
+  opacity: 1;
+}
+
+.silence-region-handle {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 6;
+}
+
+.silence-region-handle-left {
+  left: -4px;
+}
+
+.silence-region-handle-right {
+  right: -4px;
+}
+
+.silence-region-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 100%;
+  border-radius: 1px;
+  background: var(--accent-primary);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.silence-region-handle-left::after {
+  left: 3px;
+}
+
+.silence-region-handle-right::after {
+  right: 2px;
+}
+
+.silence-region-handle:hover::after {
+  opacity: 1;
+}
+
+/* ── Silence Region Controls in Track Row ── */
+
+.track-mute-region-btn {
+  padding: 2px 8px;
+  border: 1px dashed rgba(233, 69, 96, 0.4);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--accent-primary);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-left: 6px;
+}
+
+.track-mute-region-btn:hover {
+  border-color: var(--accent-primary);
+  background: rgba(233, 69, 96, 0.08);
+}
+
+.silence-regions-list {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.silence-region-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.silence-region-label {
+  color: var(--accent-primary);
+  font-weight: 600;
+  min-width: 32px;
+}
+
+.silence-region-input {
+  width: 64px;
+  padding: 2px 4px;
+  background: var(--bg-deepest);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.silence-region-input:focus {
+  border-color: var(--accent-primary);
+  outline: none;
+}
+
+.silence-region-to {
+  color: var(--text-dimmed);
+  font-size: 0.68rem;
+}
+
+.silence-region-sec {
+  color: var(--text-dimmed);
+  font-size: 0.68rem;
+}
+
+.silence-region-row-delete {
+  background: none;
+  border: none;
+  color: var(--text-dimmed);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color var(--transition-fast);
+}
+
+.silence-region-row-delete:hover {
+  color: var(--accent-primary);
+}
+
+/* ═══════════════════════════════════════════════
    Backing Track Generator
    ═══════════════════════════════════════════════ */
 

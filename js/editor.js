@@ -100,6 +100,7 @@
   /* ── Track Slots state ── */
   var trackSlots = [];
   var nextSlotId = 0;
+  var nextSilenceRegionId = 0;
 
   /* ── Trim state ── */
   var trimStartRatio = 0;
@@ -142,7 +143,7 @@
   function fmtTime(sec) {
     var m = Math.floor(sec / 60);
     var s = sec % 60;
-    return m + ':' + s.toFixed(1).padStart(4, '0');
+    return m + ':' + s.toFixed(2).padStart(5, '0');
   }
 
   function formatPan(pan) {
@@ -527,7 +528,8 @@
       fxChainNodes: null,
       startOffset: 0,
       clipStart: 0,
-      clipEnd: null
+      clipEnd: null,
+      silenceRegions: []
     });
     rebuildTracksUI();
     updateTrackCount();
@@ -584,6 +586,7 @@
     slot.startOffset = 0;
     slot.clipStart = 0;
     slot.clipEnd = null;
+    slot.silenceRegions = [];
     rebuildTracksUI();
     recalcDuration();
     buildWaveformLanes();
@@ -608,6 +611,50 @@
     updateWorkspaceVisibility();
     dispatchSeparatorEvent();
     if (getAssignedSlots().length === 0) stopPlayback();
+  }
+
+  /* ── Silence Region helpers ── */
+
+  function addSilenceRegion(slot) {
+    var center = totalDuration / 2;
+    var halfW = 0.5;
+    slot.silenceRegions.push({
+      id: nextSilenceRegionId++,
+      start: Math.max(0, center - halfW),
+      end: Math.min(totalDuration || 1, center + halfW)
+    });
+    rebuildTracksUI();
+    recalcDuration();
+    buildWaveformLanes();
+    drawAllWaveforms();
+  }
+
+  function removeSilenceRegion(slot, regionId) {
+    slot.silenceRegions = slot.silenceRegions.filter(function(r) { return r.id !== regionId; });
+    rebuildTracksUI();
+    buildWaveformLanes();
+    drawAllWaveforms();
+  }
+
+  function applySilenceRegionAutomation(gainNode, slot, refTime, maxDur) {
+    if (!slot.silenceRegions || slot.silenceRegions.length === 0) return;
+    var sorted = slot.silenceRegions.slice().sort(function(a, b) { return a.start - b.start; });
+    var fadeDur = 0.005;
+
+    for (var i = 0; i < sorted.length; i++) {
+      var r = sorted[i];
+      var ms = Math.max(0, r.start - refTime);
+      var me = Math.max(0, r.end - refTime);
+      if (me <= 0 || ms >= maxDur) continue;
+      ms = Math.max(0, ms);
+      me = Math.min(maxDur, me);
+      // Ramp to silence
+      gainNode.gain.setValueAtTime(slot.volume, ms);
+      gainNode.gain.linearRampToValueAtTime(0, Math.min(ms + fadeDur, me));
+      // Ramp back to volume
+      gainNode.gain.setValueAtTime(0, Math.max(me - fadeDur, ms + fadeDur));
+      gainNode.gain.linearRampToValueAtTime(slot.volume, me);
+    }
   }
 
   function updateTrackCount() {
@@ -773,6 +820,92 @@
             offLabel.className = 'track-offset-label';
             offLabel.textContent = '@' + fmtTime(slot.startOffset);
             infoBar.appendChild(offLabel);
+          }
+
+          // Mute Region button
+          (function(theSlot) {
+            var muteBtn = document.createElement('button');
+            muteBtn.className = 'track-mute-region-btn';
+            muteBtn.textContent = '+ Mute Region';
+            muteBtn.title = 'Add a silence region to this track';
+            muteBtn.addEventListener('click', function() { addSilenceRegion(theSlot); });
+            infoBar.appendChild(muteBtn);
+          })(slot);
+
+          // Silence region editable rows
+          if (slot.silenceRegions.length > 0) {
+            var silenceList = document.createElement('div');
+            silenceList.className = 'silence-regions-list';
+
+            for (var sr = 0; sr < slot.silenceRegions.length; sr++) {
+              (function(region, theSlot) {
+                var row2 = document.createElement('div');
+                row2.className = 'silence-region-row';
+
+                var lbl = document.createElement('span');
+                lbl.className = 'silence-region-label';
+                lbl.textContent = 'Mute:';
+                row2.appendChild(lbl);
+
+                var startIn = document.createElement('input');
+                startIn.type = 'number';
+                startIn.className = 'silence-region-input';
+                startIn.step = '0.01';
+                startIn.min = '0';
+                startIn.value = region.start.toFixed(2);
+                startIn.title = 'Silence start (seconds)';
+                row2.appendChild(startIn);
+
+                var toLbl = document.createElement('span');
+                toLbl.className = 'silence-region-to';
+                toLbl.textContent = 'to';
+                row2.appendChild(toLbl);
+
+                var endIn = document.createElement('input');
+                endIn.type = 'number';
+                endIn.className = 'silence-region-input';
+                endIn.step = '0.01';
+                endIn.min = '0';
+                endIn.value = region.end.toFixed(2);
+                endIn.title = 'Silence end (seconds)';
+                row2.appendChild(endIn);
+
+                var secLbl = document.createElement('span');
+                secLbl.className = 'silence-region-sec';
+                secLbl.textContent = 's';
+                row2.appendChild(secLbl);
+
+                var delBtn = document.createElement('button');
+                delBtn.className = 'silence-region-row-delete';
+                delBtn.textContent = '\u00d7';
+                delBtn.title = 'Remove this silence region';
+                delBtn.addEventListener('click', function() { removeSilenceRegion(theSlot, region.id); });
+                row2.appendChild(delBtn);
+
+                startIn.addEventListener('change', function() {
+                  var v = parseFloat(startIn.value);
+                  if (isNaN(v) || v < 0) v = 0;
+                  if (v >= region.end - 0.05) v = region.end - 0.05;
+                  region.start = Math.max(0, v);
+                  startIn.value = region.start.toFixed(2);
+                  buildWaveformLanes();
+                  drawAllWaveforms();
+                });
+
+                endIn.addEventListener('change', function() {
+                  var v = parseFloat(endIn.value);
+                  if (isNaN(v) || v < region.start + 0.05) v = region.start + 0.05;
+                  if (v > (totalDuration || 999)) v = totalDuration || 999;
+                  region.end = v;
+                  endIn.value = region.end.toFixed(2);
+                  buildWaveformLanes();
+                  drawAllWaveforms();
+                });
+
+                silenceList.appendChild(row2);
+              })(slot.silenceRegions[sr], slot);
+            }
+            assigned.appendChild(silenceList);
           }
 
           // Draw mini waveform after append
@@ -962,6 +1095,33 @@
       rightHandle.className = 'track-clip-handle track-clip-handle-right';
       overlay.appendChild(rightHandle);
 
+      // Silence region overlays
+      for (var sr = 0; sr < assigned[i].silenceRegions.length; sr++) {
+        (function(region, theSlot) {
+          var srOverlay = document.createElement('div');
+          srOverlay.className = 'silence-region-overlay';
+
+          var srDel = document.createElement('button');
+          srDel.className = 'silence-region-delete';
+          srDel.textContent = '\u00d7';
+          srDel.title = 'Remove silence region';
+          srOverlay.appendChild(srDel);
+
+          var srLeft = document.createElement('div');
+          srLeft.className = 'silence-region-handle silence-region-handle-left';
+          srOverlay.appendChild(srLeft);
+
+          var srRight = document.createElement('div');
+          srRight.className = 'silence-region-handle silence-region-handle-right';
+          srOverlay.appendChild(srRight);
+
+          lane.appendChild(srOverlay);
+          region._overlay = srOverlay;
+
+          initSilenceRegionDrag(srOverlay, srLeft, srRight, srDel, theSlot, region, lane);
+        })(assigned[i].silenceRegions[sr], assigned[i]);
+      }
+
       waveformLanes.appendChild(lane);
       assigned[i]._globalCanvas = canvas;
       assigned[i]._overlay = overlay;
@@ -983,6 +1143,16 @@
       var widthPct = totalDuration > 0 ? (effDur / totalDuration) * 100 : 100;
       ov.style.left = leftPct + '%';
       ov.style.width = widthPct + '%';
+
+      // Position silence region overlays
+      for (var sr = 0; sr < assigned[i].silenceRegions.length; sr++) {
+        var region = assigned[i].silenceRegions[sr];
+        if (!region._overlay) continue;
+        var rLeft = totalDuration > 0 ? (region.start / totalDuration) * 100 : 0;
+        var rWidth = totalDuration > 0 ? ((region.end - region.start) / totalDuration) * 100 : 0;
+        region._overlay.style.left = rLeft + '%';
+        region._overlay.style.width = rWidth + '%';
+      }
     }
   }
 
@@ -1002,8 +1172,8 @@
         var dx = ev.clientX - startX;
         var dtSec = (dx / rect.width) * origDuration;
         var newOffset = origOffset + dtSec;
-        // Snap to 0.1s unless Shift held
-        if (!ev.shiftKey) newOffset = Math.round(newOffset * 10) / 10;
+        // Snap to 0.01s unless Shift held
+        if (!ev.shiftKey) newOffset = Math.round(newOffset * 100) / 100;
         slot.startOffset = Math.max(0, newOffset);
         recalcDuration();
         updateAllOverlays();
@@ -1033,7 +1203,7 @@
         var xRatio = (ev.clientX - rect.left) / rect.width;
         var timelineSec = xRatio * origDuration;
         var newClipEnd = timelineSec - slot.startOffset + (slot.clipStart || 0);
-        if (!ev.shiftKey) newClipEnd = Math.round(newClipEnd * 10) / 10;
+        if (!ev.shiftKey) newClipEnd = Math.round(newClipEnd * 100) / 100;
         newClipEnd = Math.max((slot.clipStart || 0) + 0.1, Math.min(newClipEnd, lf.buffer.duration));
         slot.clipEnd = newClipEnd;
         recalcDuration();
@@ -1065,7 +1235,7 @@
         ev.preventDefault();
         var xRatio = (ev.clientX - rect.left) / rect.width;
         var timelineSec = xRatio * origDuration;
-        if (!ev.shiftKey) timelineSec = Math.round(timelineSec * 10) / 10;
+        if (!ev.shiftKey) timelineSec = Math.round(timelineSec * 100) / 100;
         timelineSec = Math.max(0, Math.min(timelineSec, rightEdgeTime - 0.1));
         var delta = timelineSec - origStartOffset;
         slot.startOffset = timelineSec;
@@ -1078,6 +1248,94 @@
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
         updateTrimUI();
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+
+  function initSilenceRegionDrag(overlay, leftHandle, rightHandle, deleteBtn, slot, region, lane) {
+    var MIN_W = 0.05;
+
+    deleteBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      removeSilenceRegion(slot, region.id);
+    });
+
+    // Drag whole region
+    overlay.addEventListener('mousedown', function(e) {
+      if (e.target === leftHandle || e.target === rightHandle || e.target === deleteBtn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var rect = lane.getBoundingClientRect();
+      var startX = e.clientX;
+      var origStart = region.start;
+      var origEnd = region.end;
+      var w = origEnd - origStart;
+      var dur = totalDuration || 1;
+
+      var onMove = function(ev) {
+        ev.preventDefault();
+        var dx = ev.clientX - startX;
+        var dt = (dx / rect.width) * dur;
+        var ns = origStart + dt;
+        if (!ev.shiftKey) ns = Math.round(ns * 100) / 100;
+        ns = Math.max(0, Math.min(ns, (totalDuration || 1) - w));
+        region.start = ns;
+        region.end = ns + w;
+        updateAllOverlays();
+      };
+      var onUp = function() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    // Left handle
+    leftHandle.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var rect = lane.getBoundingClientRect();
+      var dur = totalDuration || 1;
+
+      var onMove = function(ev) {
+        ev.preventDefault();
+        var xr = (ev.clientX - rect.left) / rect.width;
+        var ts = xr * dur;
+        if (!ev.shiftKey) ts = Math.round(ts * 100) / 100;
+        region.start = Math.max(0, Math.min(ts, region.end - MIN_W));
+        updateAllOverlays();
+      };
+      var onUp = function() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        rebuildTracksUI();
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    // Right handle
+    rightHandle.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var rect = lane.getBoundingClientRect();
+      var dur = totalDuration || 1;
+
+      var onMove = function(ev) {
+        ev.preventDefault();
+        var xr = (ev.clientX - rect.left) / rect.width;
+        var ts = xr * dur;
+        if (!ev.shiftKey) ts = Math.round(ts * 100) / 100;
+        region.end = Math.max(region.start + MIN_W, Math.min(ts, totalDuration || 1));
+        updateAllOverlays();
+      };
+      var onUp = function() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        rebuildTracksUI();
       };
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
@@ -1600,6 +1858,7 @@
 
       var gain = playCtx.createGain();
       gain.gain.value = slot.volume;
+      applySilenceRegionAutomation(gain, slot, playheadTimeSec, playDuration);
 
       var panner = playCtx.createStereoPanner();
       panner.pan.value = slot.pan;
@@ -1745,6 +2004,7 @@
 
         var gain = offCtx.createGain();
         gain.gain.value = slot.volume;
+        applySilenceRegionAutomation(gain, slot, trimStartSec, outputDurationSec);
 
         var panner = offCtx.createStereoPanner();
         panner.pan.value = slot.pan;
