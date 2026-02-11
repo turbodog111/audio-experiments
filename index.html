@@ -19,12 +19,12 @@
   <!-- Logo -->
   <img class="logo" src="MP3 Master Editor.png" alt="MP3 Master Editor" title="MP3 Master Editor">
 
-  <div class="container">
+  <div class="container editor-active">
     <!-- Tab navigation -->
     <div class="tabs">
-      <button class="tab-btn active" data-tab="repeater">MP3 Repeater</button>
+      <button class="tab-btn active" data-tab="editor">MP3 Editor</button>
+      <button class="tab-btn" data-tab="repeater">MP3 Repeater</button>
       <button class="tab-btn" data-tab="setlist">Set List Creator</button>
-      <button class="tab-btn" data-tab="editor">MP3 Editor</button>
       <button class="tab-btn" data-tab="converter">MP3 / WAV Converter</button>
       <button class="tab-btn" data-tab="musicgen">AI Music Generator</button>
     </div>
@@ -32,7 +32,7 @@
     <!-- ════════════════════════════════════════════ -->
     <!-- Tab 1: MP3 Repeater                         -->
     <!-- ════════════════════════════════════════════ -->
-    <div class="tab-panel active" id="tab-repeater">
+    <div class="tab-panel" id="tab-repeater">
       <h2>MP3 Repeater</h2>
       <p class="subtitle">Upload an MP3, choose how many times it repeats, and download the result.</p>
 
@@ -113,7 +113,7 @@
     <!-- ════════════════════════════════════════════ -->
     <!-- Tab 3: MP3 Editor                           -->
     <!-- ════════════════════════════════════════════ -->
-    <div class="tab-panel" id="tab-editor">
+    <div class="tab-panel active" id="tab-editor">
       <h2>MP3 Editor</h2>
       <p class="subtitle">Upload MP3s to the file library, drag them onto tracks, mix with volume &amp; pan, trim, fade, and export.</p>
 
@@ -499,6 +499,7 @@
           <li>Toggle effects: <strong>EQ</strong>, <strong>Compressor</strong>, <strong>Reverb</strong>, <strong>Delay</strong>, <strong>Distortion</strong>.</li>
           <li>Select a target (<strong>Master</strong> or individual track) above the effect panels to apply effects per-track or globally.</li>
           <li>Click <strong>Play (Space)</strong> to preview. Click <strong>"Export Mixed MP3"</strong> to download the final file.</li>
+          <li>Use the <strong>"Generate Backing Track"</strong> panel in the File Library (right panel) to create drum, bass, or chord pad tracks. Set BPM, key, pattern, and duration, then click <strong>"Generate"</strong> &mdash; the track appears in your library ready to assign.</li>
         </ol>
       </div>
       <div class="guide-section" id="guide-converter">
@@ -547,6 +548,7 @@
   <script src="js/setlist.js"></script>
   <script src="js/analyzer.js"></script>
   <script src="js/editor.js"></script>
+  <script src="js/backing-tracks.js"></script>
   <script src="js/converter.js"></script>
   <script src="js/separator.js"></script>
   <script src="js/musicgen.js"></script>

@@ -1916,6 +1916,166 @@ button.action-btn.musicgen-btn:hover:not(:disabled) {
 }
 
 /* ═══════════════════════════════════════════════
+   Backing Track Generator
+   ═══════════════════════════════════════════════ */
+
+.bt-section {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.bt-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  user-select: none;
+}
+
+.bt-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.bt-header-icon {
+  font-size: 0.9rem;
+  color: var(--accent-purple);
+}
+
+.bt-header-text {
+  flex: 1;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.bt-header-arrow {
+  font-size: 0.7rem;
+  color: var(--text-dimmed);
+  transition: transform var(--transition-fast);
+}
+
+.bt-body {
+  padding: 0 16px 16px;
+}
+
+.bt-row {
+  margin-bottom: 10px;
+}
+
+.bt-row label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.bt-row select,
+.bt-row input[type="number"] {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  background: var(--bg-deepest);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.82rem;
+  transition: border-color var(--transition-fast);
+}
+
+.bt-row select:focus,
+.bt-row input[type="number"]:focus {
+  outline: none;
+  border-color: var(--accent-purple);
+}
+
+.bt-bpm-row,
+.bt-key-row,
+.bt-dur-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.bt-bpm-row input[type="number"] {
+  flex: 1;
+}
+
+.bt-bpm-row button {
+  padding: 6px 10px;
+  border: 1px solid var(--accent-blue);
+  border-radius: var(--radius-sm);
+  background: var(--accent-blue-glow);
+  color: var(--accent-blue);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.bt-bpm-row button:hover {
+  background: var(--accent-blue);
+  color: var(--bg-deepest);
+}
+
+.bt-key-row select {
+  flex: 1;
+}
+
+.bt-dur-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent-purple);
+}
+
+.bt-dur-row span {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--accent-green);
+  min-width: 36px;
+  text-align: right;
+}
+
+.bt-generate-btn {
+  width: 100%;
+  padding: 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--accent-purple), #4a44d4);
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: 0 2px 8px var(--accent-purple-glow);
+}
+
+.bt-generate-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--accent-purple-hover), var(--accent-purple));
+  box-shadow: 0 4px 12px rgba(108, 99, 255, 0.35);
+  transform: translateY(-1px);
+}
+
+.bt-generate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.bt-status {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  text-align: center;
+  min-height: 1.2em;
+  transition: color var(--transition-fast);
+}
+
+/* ═══════════════════════════════════════════════
    Responsive
    ═══════════════════════════════════════════════ */
 

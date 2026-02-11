@@ -380,6 +380,33 @@
     rebuildLibraryUI();
   }
 
+  /* ── Public bridge for backing-tracks.js to inject synthetic audio ── */
+  window.addSyntheticToLibrary = function(name, buffer) {
+    var fileAnalysis = null;
+    try { fileAnalysis = analyzeAudio(buffer); } catch (_) {}
+
+    var entry = {
+      id: nextFileId++,
+      file: null,
+      buffer: buffer,
+      name: name,
+      duration: buffer.duration,
+      size: Math.round(buffer.length * buffer.numberOfChannels * 4),
+      analysis: fileAnalysis
+    };
+    libraryFiles.push(entry);
+
+    uploadArea.classList.add('has-file');
+    fileNameEl.textContent = libraryFiles.length + ' file' + (libraryFiles.length !== 1 ? 's' : '') + ' in library';
+
+    if (trackSlots.length === 0) {
+      addTrackSlot();
+    }
+
+    rebuildLibraryUI();
+    return entry.id;
+  };
+
   function removeFromLibrary(fileId) {
     libraryFiles = libraryFiles.filter(function(f) { return f.id !== fileId; });
 
@@ -426,7 +453,7 @@
 
         var icon = document.createElement('span');
         icon.className = 'file-panel-icon';
-        icon.textContent = '\u266A';
+        icon.textContent = lf.file === null ? '\u2699' : '\u266A';
         item.appendChild(icon);
 
         var info = document.createElement('div');
