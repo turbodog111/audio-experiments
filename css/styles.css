@@ -2195,7 +2195,7 @@ button.action-btn.musicgen-btn:hover:not(:disabled) {
   position: absolute;
   bottom: 4px;
   left: 4px;
-  right: 20px;
+  right: 54px;
   height: 12px;
   -webkit-appearance: none;
   appearance: none;
@@ -2213,6 +2213,23 @@ button.action-btn.musicgen-btn:hover:not(:disabled) {
   border-radius: 50%;
   background: #26a69a;
   cursor: pointer;
+}
+
+.volume-region-text-input {
+  position: absolute;
+  bottom: 2px;
+  right: 20px;
+  width: 32px;
+  height: 16px;
+  background: rgba(0,0,0,0.4);
+  color: #26a69a;
+  border: 1px solid rgba(38,166,154,0.4);
+  border-radius: 3px;
+  font-size: 0.55rem;
+  font-family: 'JetBrains Mono', monospace;
+  text-align: center;
+  z-index: 7;
+  padding: 0;
 }
 
 .volume-region-level-label {
@@ -2245,6 +2262,162 @@ button.action-btn.musicgen-btn:hover:not(:disabled) {
   border-radius: 50%;
   background: #26a69a;
   cursor: pointer;
+}
+
+/* ── Boost Region Overlays ── */
+
+.boost-region-overlay {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: rgba(255, 152, 0, 0.2);
+  border-left: 2px solid #ff9800;
+  border-right: 2px solid #ff9800;
+  z-index: 5;
+  cursor: move;
+  transition: background var(--transition-fast);
+}
+
+.boost-region-overlay:hover {
+  background: rgba(255, 152, 0, 0.35);
+}
+
+.boost-region-delete {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  background: #ff9800;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  z-index: 6;
+}
+
+.boost-region-overlay:hover .boost-region-delete {
+  opacity: 1;
+}
+
+.boost-region-handle {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 6;
+}
+
+.boost-region-handle-left { left: -4px; }
+.boost-region-handle-right { right: -4px; }
+
+.boost-region-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 100%;
+  border-radius: 1px;
+  background: #ff9800;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.boost-region-handle-left::after { left: 3px; }
+.boost-region-handle-right::after { right: 2px; }
+.boost-region-handle:hover::after { opacity: 1; }
+
+.boost-region-slider {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  right: 54px;
+  height: 12px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 152, 0, 0.3);
+  border-radius: 6px;
+  outline: none;
+  cursor: pointer;
+  z-index: 6;
+}
+
+.boost-region-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff9800;
+  cursor: pointer;
+}
+
+.boost-region-text-input {
+  position: absolute;
+  bottom: 2px;
+  right: 20px;
+  width: 32px;
+  height: 16px;
+  background: rgba(0,0,0,0.4);
+  color: #ff9800;
+  border: 1px solid rgba(255,152,0,0.4);
+  border-radius: 3px;
+  font-size: 0.55rem;
+  font-family: 'JetBrains Mono', monospace;
+  text-align: center;
+  z-index: 7;
+  padding: 0;
+}
+
+.boost-region-level-label {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 0.6rem;
+  color: #ff9800;
+  font-family: 'JetBrains Mono', monospace;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.boost-region-row-slider {
+  width: 50px;
+  height: 14px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 152, 0, 0.2);
+  border-radius: 6px;
+  outline: none;
+  cursor: pointer;
+  margin: 0 4px;
+}
+
+.boost-region-row-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff9800;
+  cursor: pointer;
+}
+
+.region-row-text-input {
+  width: 36px;
+  height: 18px;
+  background: rgba(0,0,0,0.3);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-medium);
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-family: 'JetBrains Mono', monospace;
+  text-align: center;
+  padding: 0;
+  margin: 0 2px;
 }
 
 /* ── Silence Region Controls in Track Row ── */

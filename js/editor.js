@@ -109,6 +109,7 @@
   var nextSlotId = 0;
   var nextSilenceRegionId = 0;
   var nextVolumeRegionId = 0;
+  var nextBoostRegionId = 0;
 
   /* ── Trim state ── */
   var trimStartRatio = 0;
@@ -568,7 +569,8 @@
       clipStart: 0,
       clipEnd: null,
       silenceRegions: [],
-      volumeRegions: []
+      volumeRegions: [],
+      boostRegions: []
     });
     rebuildTracksUI();
     updateTrackCount();
@@ -721,6 +723,48 @@
   function applyVolumeRegionAutomation(gainNode, slot, refTime, maxDur) {
     if (!slot.volumeRegions || slot.volumeRegions.length === 0) return;
     var sorted = slot.volumeRegions.slice().sort(function(a, b) { return a.start - b.start; });
+    var fadeDur = 0.005;
+
+    for (var i = 0; i < sorted.length; i++) {
+      var r = sorted[i];
+      var targetVol = r.level * slot.volume;
+      var ms = Math.max(0, r.start - refTime);
+      var me = Math.max(0, r.end - refTime);
+      if (me <= 0 || ms >= maxDur) continue;
+      ms = Math.max(0, ms);
+      me = Math.min(maxDur, me);
+      gainNode.gain.setValueAtTime(slot.volume, ms);
+      gainNode.gain.linearRampToValueAtTime(targetVol, Math.min(ms + fadeDur, me));
+      gainNode.gain.setValueAtTime(targetVol, Math.max(me - fadeDur, ms + fadeDur));
+      gainNode.gain.linearRampToValueAtTime(slot.volume, me);
+    }
+  }
+
+  function addBoostRegion(slot) {
+    var center = playheadRatio * totalDuration;
+    var halfW = 0.5;
+    slot.boostRegions.push({
+      id: nextBoostRegionId++,
+      start: Math.max(0, center - halfW),
+      end: Math.min(totalDuration || 1, center + halfW),
+      level: 1.25
+    });
+    rebuildTracksUI();
+    recalcDuration();
+    buildWaveformLanes();
+    drawAllWaveforms();
+  }
+
+  function removeBoostRegion(slot, regionId) {
+    slot.boostRegions = slot.boostRegions.filter(function(r) { return r.id !== regionId; });
+    rebuildTracksUI();
+    buildWaveformLanes();
+    drawAllWaveforms();
+  }
+
+  function applyBoostRegionAutomation(gainNode, slot, refTime, maxDur) {
+    if (!slot.boostRegions || slot.boostRegions.length === 0) return;
+    var sorted = slot.boostRegions.slice().sort(function(a, b) { return a.start - b.start; });
     var fadeDur = 0.005;
 
     for (var i = 0; i < sorted.length; i++) {
@@ -937,6 +981,15 @@
             volRegBtn.title = 'Add a volume reduction region to this track';
             volRegBtn.addEventListener('click', function() { addVolumeRegion(theSlot); });
             infoBar.appendChild(volRegBtn);
+
+            var boostRegBtn = document.createElement('button');
+            boostRegBtn.className = 'track-mute-region-btn';
+            boostRegBtn.style.borderColor = 'rgba(255, 152, 0, 0.4)';
+            boostRegBtn.style.color = '#ff9800';
+            boostRegBtn.textContent = '+ Boost Audio';
+            boostRegBtn.title = 'Add a volume boost region to this track (up to 150%)';
+            boostRegBtn.addEventListener('click', function() { addBoostRegion(theSlot); });
+            infoBar.appendChild(boostRegBtn);
           })(slot);
 
           // Silence region editable rows
@@ -1064,17 +1117,34 @@
                 lvlRange.className = 'volume-region-row-slider';
                 lvlRange.min = '0';
                 lvlRange.max = '100';
+                lvlRange.step = '5';
                 lvlRange.value = Math.round(region.level * 100);
                 row3.appendChild(lvlRange);
 
+                var lvlInput = document.createElement('input');
+                lvlInput.type = 'number';
+                lvlInput.className = 'region-row-text-input';
+                lvlInput.min = '0';
+                lvlInput.max = '100';
+                lvlInput.step = '5';
+                lvlInput.value = Math.round(region.level * 100);
+                row3.appendChild(lvlInput);
+
                 var lvlLabel = document.createElement('span');
                 lvlLabel.className = 'silence-region-sec';
-                lvlLabel.textContent = Math.round(region.level * 100) + '%';
+                lvlLabel.textContent = '%';
                 row3.appendChild(lvlLabel);
 
                 lvlRange.addEventListener('input', function() {
                   region.level = parseInt(lvlRange.value) / 100;
-                  lvlLabel.textContent = lvlRange.value + '%';
+                  lvlInput.value = lvlRange.value;
+                });
+                lvlInput.addEventListener('change', function() {
+                  var v = parseInt(lvlInput.value) || 0;
+                  v = Math.max(0, Math.min(100, Math.round(v / 5) * 5));
+                  lvlInput.value = v;
+                  region.level = v / 100;
+                  lvlRange.value = v;
                 });
 
                 var delBtn3 = document.createElement('button');
@@ -1108,6 +1178,118 @@
               })(slot.volumeRegions[vr], slot);
             }
             assigned.appendChild(volList);
+          }
+
+          // Boost region editable rows
+          if (slot.boostRegions && slot.boostRegions.length > 0) {
+            var boostList = document.createElement('div');
+            boostList.className = 'silence-regions-list';
+
+            for (var bri = 0; bri < slot.boostRegions.length; bri++) {
+              (function(region, theSlot) {
+                var row4 = document.createElement('div');
+                row4.className = 'silence-region-row';
+
+                var lbl4 = document.createElement('span');
+                lbl4.className = 'silence-region-label';
+                lbl4.style.color = '#ff9800';
+                lbl4.textContent = 'Boost:';
+                row4.appendChild(lbl4);
+
+                var startIn4 = document.createElement('input');
+                startIn4.type = 'number';
+                startIn4.className = 'silence-region-input';
+                startIn4.step = '0.01';
+                startIn4.min = '0';
+                startIn4.value = region.start.toFixed(2);
+                startIn4.title = 'Boost region start (seconds)';
+                row4.appendChild(startIn4);
+
+                var toLbl4 = document.createElement('span');
+                toLbl4.className = 'silence-region-to';
+                toLbl4.textContent = 'to';
+                row4.appendChild(toLbl4);
+
+                var endIn4 = document.createElement('input');
+                endIn4.type = 'number';
+                endIn4.className = 'silence-region-input';
+                endIn4.step = '0.01';
+                endIn4.min = '0';
+                endIn4.value = region.end.toFixed(2);
+                endIn4.title = 'Boost region end (seconds)';
+                row4.appendChild(endIn4);
+
+                var secLbl4 = document.createElement('span');
+                secLbl4.className = 'silence-region-sec';
+                secLbl4.textContent = 's';
+                row4.appendChild(secLbl4);
+
+                var bstRange = document.createElement('input');
+                bstRange.type = 'range';
+                bstRange.className = 'boost-region-row-slider';
+                bstRange.min = '0';
+                bstRange.max = '150';
+                bstRange.step = '5';
+                bstRange.value = Math.round(region.level * 100);
+                row4.appendChild(bstRange);
+
+                var bstInput = document.createElement('input');
+                bstInput.type = 'number';
+                bstInput.className = 'region-row-text-input';
+                bstInput.min = '0';
+                bstInput.max = '150';
+                bstInput.step = '5';
+                bstInput.value = Math.round(region.level * 100);
+                row4.appendChild(bstInput);
+
+                var bstLbl = document.createElement('span');
+                bstLbl.className = 'silence-region-sec';
+                bstLbl.textContent = '%';
+                row4.appendChild(bstLbl);
+
+                bstRange.addEventListener('input', function() {
+                  region.level = parseInt(bstRange.value) / 100;
+                  bstInput.value = bstRange.value;
+                });
+                bstInput.addEventListener('change', function() {
+                  var v = parseInt(bstInput.value) || 0;
+                  v = Math.max(0, Math.min(150, Math.round(v / 5) * 5));
+                  bstInput.value = v;
+                  region.level = v / 100;
+                  bstRange.value = v;
+                });
+
+                var delBtn4 = document.createElement('button');
+                delBtn4.className = 'silence-region-row-delete';
+                delBtn4.textContent = '\u00d7';
+                delBtn4.title = 'Remove this boost region';
+                delBtn4.addEventListener('click', function() { removeBoostRegion(theSlot, region.id); });
+                row4.appendChild(delBtn4);
+
+                startIn4.addEventListener('change', function() {
+                  var v = parseFloat(startIn4.value);
+                  if (isNaN(v) || v < 0) v = 0;
+                  if (v >= region.end - 0.05) v = region.end - 0.05;
+                  region.start = Math.max(0, v);
+                  startIn4.value = region.start.toFixed(2);
+                  buildWaveformLanes();
+                  drawAllWaveforms();
+                });
+
+                endIn4.addEventListener('change', function() {
+                  var v = parseFloat(endIn4.value);
+                  if (isNaN(v) || v < region.start + 0.05) v = region.start + 0.05;
+                  if (v > (totalDuration || 999)) v = totalDuration || 999;
+                  region.end = v;
+                  endIn4.value = region.end.toFixed(2);
+                  buildWaveformLanes();
+                  drawAllWaveforms();
+                });
+
+                boostList.appendChild(row4);
+              })(slot.boostRegions[bri], slot);
+            }
+            assigned.appendChild(boostList);
           }
 
           // Draw mini waveform after append
@@ -1342,9 +1524,19 @@
             vrSlider.className = 'volume-region-slider';
             vrSlider.min = '0';
             vrSlider.max = '100';
+            vrSlider.step = '5';
             vrSlider.value = Math.round(region.level * 100);
             vrSlider.title = Math.round(region.level * 100) + '%';
             vrOverlay.appendChild(vrSlider);
+
+            var vrTextInput = document.createElement('input');
+            vrTextInput.type = 'number';
+            vrTextInput.className = 'volume-region-text-input';
+            vrTextInput.min = '0';
+            vrTextInput.max = '100';
+            vrTextInput.step = '5';
+            vrTextInput.value = Math.round(region.level * 100);
+            vrOverlay.appendChild(vrTextInput);
 
             var vrLabel = document.createElement('span');
             vrLabel.className = 'volume-region-level-label';
@@ -1356,8 +1548,21 @@
               region.level = parseInt(vrSlider.value) / 100;
               vrSlider.title = vrSlider.value + '%';
               vrLabel.textContent = vrSlider.value + '%';
+              vrTextInput.value = vrSlider.value;
             });
             vrSlider.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+
+            vrTextInput.addEventListener('change', function(e) {
+              e.stopPropagation();
+              var v = parseInt(vrTextInput.value) || 0;
+              v = Math.max(0, Math.min(100, Math.round(v / 5) * 5));
+              vrTextInput.value = v;
+              region.level = v / 100;
+              vrSlider.value = v;
+              vrSlider.title = v + '%';
+              vrLabel.textContent = v + '%';
+            });
+            vrTextInput.addEventListener('mousedown', function(e) { e.stopPropagation(); });
 
             var vrLeft = document.createElement('div');
             vrLeft.className = 'volume-region-handle volume-region-handle-left';
@@ -1372,6 +1577,80 @@
 
             initVolumeRegionDrag(vrOverlay, vrLeft, vrRight, vrDel, vrSlider, theSlot, region, lane);
           })(assigned[i].volumeRegions[vr], assigned[i]);
+        }
+      }
+
+      // Boost region overlays
+      if (assigned[i].boostRegions) {
+        for (var br = 0; br < assigned[i].boostRegions.length; br++) {
+          (function(region, theSlot) {
+            var brOverlay = document.createElement('div');
+            brOverlay.className = 'boost-region-overlay';
+
+            var brDel = document.createElement('button');
+            brDel.className = 'boost-region-delete';
+            brDel.textContent = '\u00d7';
+            brDel.title = 'Remove boost region';
+            brOverlay.appendChild(brDel);
+
+            var brSlider = document.createElement('input');
+            brSlider.type = 'range';
+            brSlider.className = 'boost-region-slider';
+            brSlider.min = '0';
+            brSlider.max = '150';
+            brSlider.step = '5';
+            brSlider.value = Math.round(region.level * 100);
+            brSlider.title = Math.round(region.level * 100) + '%';
+            brOverlay.appendChild(brSlider);
+
+            var brInput = document.createElement('input');
+            brInput.type = 'number';
+            brInput.className = 'boost-region-text-input';
+            brInput.min = '0';
+            brInput.max = '150';
+            brInput.step = '5';
+            brInput.value = Math.round(region.level * 100);
+            brOverlay.appendChild(brInput);
+
+            var brLabel = document.createElement('span');
+            brLabel.className = 'boost-region-level-label';
+            brLabel.textContent = Math.round(region.level * 100) + '%';
+            brOverlay.appendChild(brLabel);
+
+            brSlider.addEventListener('input', function(e) {
+              e.stopPropagation();
+              region.level = parseInt(brSlider.value) / 100;
+              brSlider.title = brSlider.value + '%';
+              brLabel.textContent = brSlider.value + '%';
+              brInput.value = brSlider.value;
+            });
+            brSlider.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+
+            brInput.addEventListener('change', function(e) {
+              e.stopPropagation();
+              var v = parseInt(brInput.value) || 0;
+              v = Math.max(0, Math.min(150, Math.round(v / 5) * 5));
+              brInput.value = v;
+              region.level = v / 100;
+              brSlider.value = v;
+              brSlider.title = v + '%';
+              brLabel.textContent = v + '%';
+            });
+            brInput.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+
+            var brLeft = document.createElement('div');
+            brLeft.className = 'boost-region-handle boost-region-handle-left';
+            brOverlay.appendChild(brLeft);
+
+            var brRight = document.createElement('div');
+            brRight.className = 'boost-region-handle boost-region-handle-right';
+            brOverlay.appendChild(brRight);
+
+            lane.appendChild(brOverlay);
+            region._overlay = brOverlay;
+
+            initBoostRegionDrag(brOverlay, brLeft, brRight, brDel, brSlider, theSlot, region, lane);
+          })(assigned[i].boostRegions[br], assigned[i]);
         }
       }
 
@@ -1417,6 +1696,16 @@
           if (!vRegion._overlay) continue;
           vRegion._overlay.style.left = (vRegion.start * pixelsPerSecond) + 'px';
           vRegion._overlay.style.width = ((vRegion.end - vRegion.start) * pixelsPerSecond) + 'px';
+        }
+      }
+
+      // Position boost region overlays
+      if (assigned[i].boostRegions) {
+        for (var bri = 0; bri < assigned[i].boostRegions.length; bri++) {
+          var bRegion = assigned[i].boostRegions[bri];
+          if (!bRegion._overlay) continue;
+          bRegion._overlay.style.left = (bRegion.start * pixelsPerSecond) + 'px';
+          bRegion._overlay.style.width = ((bRegion.end - bRegion.start) * pixelsPerSecond) + 'px';
         }
       }
     }
@@ -1621,7 +1910,7 @@
 
     // Drag whole region
     overlay.addEventListener('mousedown', function(e) {
-      if (e.target === leftHandle || e.target === rightHandle || e.target === deleteBtn || e.target === slider) return;
+      if (e.target === leftHandle || e.target === rightHandle || e.target === deleteBtn || e.target === slider || e.target.type === 'number') return;
       e.preventDefault();
       e.stopPropagation();
       var startX = e.clientX;
@@ -1673,6 +1962,88 @@
     });
 
     // Right handle
+    rightHandle.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      var onMove = function(ev) {
+        ev.preventDefault();
+        var rect = lane.getBoundingClientRect();
+        var ts = (ev.clientX - rect.left) / pixelsPerSecond;
+        if (!ev.shiftKey) ts = Math.round(ts * 100) / 100;
+        if (!ev.shiftKey) ts = snapToBookmark(ts);
+        region.end = Math.max(region.start + MIN_W, Math.min(ts, totalDuration || 1));
+        updateAllOverlays();
+      };
+      var onUp = function() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        rebuildTracksUI();
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+
+  function initBoostRegionDrag(overlay, leftHandle, rightHandle, deleteBtn, slider, slot, region, lane) {
+    var MIN_W = 0.05;
+
+    deleteBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      removeBoostRegion(slot, region.id);
+    });
+
+    overlay.addEventListener('mousedown', function(e) {
+      if (e.target === leftHandle || e.target === rightHandle || e.target === deleteBtn || e.target === slider || e.target.type === 'number') return;
+      e.preventDefault();
+      e.stopPropagation();
+      var startX = e.clientX;
+      var origStart = region.start;
+      var origEnd = region.end;
+      var w = origEnd - origStart;
+
+      var onMove = function(ev) {
+        ev.preventDefault();
+        var dx = ev.clientX - startX;
+        var dt = dx / pixelsPerSecond;
+        var ns = origStart + dt;
+        if (!ev.shiftKey) ns = Math.round(ns * 100) / 100;
+        if (!ev.shiftKey) ns = snapToBookmark(ns);
+        ns = Math.max(0, Math.min(ns, (totalDuration || 1) - w));
+        region.start = ns;
+        region.end = ns + w;
+        updateAllOverlays();
+      };
+      var onUp = function() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    leftHandle.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      var onMove = function(ev) {
+        ev.preventDefault();
+        var rect = lane.getBoundingClientRect();
+        var ts = (ev.clientX - rect.left) / pixelsPerSecond;
+        if (!ev.shiftKey) ts = Math.round(ts * 100) / 100;
+        if (!ev.shiftKey) ts = snapToBookmark(ts);
+        region.start = Math.max(0, Math.min(ts, region.end - MIN_W));
+        updateAllOverlays();
+      };
+      var onUp = function() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        rebuildTracksUI();
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
     rightHandle.addEventListener('mousedown', function(e) {
       e.preventDefault();
       e.stopPropagation();
@@ -2317,6 +2688,7 @@
       gain.gain.value = slot.volume;
       applySilenceRegionAutomation(gain, slot, playheadTimeSec, playDuration);
       applyVolumeRegionAutomation(gain, slot, playheadTimeSec, playDuration);
+      applyBoostRegionAutomation(gain, slot, playheadTimeSec, playDuration);
 
       var panner = playCtx.createStereoPanner();
       panner.pan.value = slot.pan;
@@ -2512,6 +2884,9 @@
         }),
         volumeRegions: (s.volumeRegions || []).map(function(r) {
           return { id: r.id, start: r.start, end: r.end, level: r.level };
+        }),
+        boostRegions: (s.boostRegions || []).map(function(r) {
+          return { id: r.id, start: r.start, end: r.end, level: r.level };
         })
       });
     }
@@ -2534,6 +2909,7 @@
         slotId: nextSlotId,
         silenceRegionId: nextSilenceRegionId,
         volumeRegionId: nextVolumeRegionId,
+        boostRegionId: nextBoostRegionId,
         bookmarkId: nextBookmarkId
       }
     };
@@ -2631,6 +3007,9 @@
         }),
         volumeRegions: (t.volumeRegions || []).map(function(r) {
           return { id: r.id, start: r.start, end: r.end, level: r.level };
+        }),
+        boostRegions: (t.boostRegions || []).map(function(r) {
+          return { id: r.id, start: r.start, end: r.end, level: r.level };
         })
       });
     }
@@ -2651,6 +3030,7 @@
       nextSlotId = data.nextIds.slotId || 0;
       nextSilenceRegionId = data.nextIds.silenceRegionId || 0;
       nextVolumeRegionId = data.nextIds.volumeRegionId || 0;
+      nextBoostRegionId = data.nextIds.boostRegionId || 0;
       nextBookmarkId = data.nextIds.bookmarkId || 0;
     }
 
@@ -2790,6 +3170,7 @@
         gain.gain.value = slot.volume;
         applySilenceRegionAutomation(gain, slot, trimStartSec, outputDurationSec);
         applyVolumeRegionAutomation(gain, slot, trimStartSec, outputDurationSec);
+        applyBoostRegionAutomation(gain, slot, trimStartSec, outputDurationSec);
 
         var panner = offCtx.createStereoPanner();
         panner.pan.value = slot.pan;
