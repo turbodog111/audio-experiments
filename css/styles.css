@@ -1232,6 +1232,17 @@ body.drag-in-progress .track-drop-zone .drop-zone-text {
   text-align: right;
 }
 
+.effect-section-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
 /* ═══════════════════════════════════════════════
    Stem Separator
    ═══════════════════════════════════════════════ */

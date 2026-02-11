@@ -166,10 +166,16 @@
               <button id="ed-playToggle">Play (Space)</button>
               <button id="ed-resetBtn">Reset trim</button>
               <button id="ed-fadeToggle">Fade In/Out</button>
+              <button id="ed-eqToggle">Equalizer</button>
+              <button id="ed-compToggle">Compressor</button>
+              <button id="ed-reverbToggle">Reverb</button>
+              <button id="ed-delayToggle">Delay</button>
+              <button id="ed-distortToggle">Distortion</button>
             </div>
 
             <!-- Fade controls -->
             <div class="effect-controls" id="ed-fadeControls">
+              <div class="effect-section-title">Fade In / Out</div>
               <div class="effect-row">
                 <label>Fade in:</label>
                 <input type="range" id="ed-fadeIn" min="0" max="10" step="0.1" value="0">
@@ -179,6 +185,101 @@
                 <label>Fade out:</label>
                 <input type="range" id="ed-fadeOut" min="0" max="10" step="0.1" value="0">
                 <span class="range-val" id="ed-fadeOutVal">0.0s</span>
+              </div>
+            </div>
+
+            <!-- Equalizer controls -->
+            <div class="effect-controls" id="ed-eqControls">
+              <div class="effect-section-title">3-Band Equalizer</div>
+              <div class="effect-row">
+                <label>Low (320Hz):</label>
+                <input type="range" id="ed-eqLow" min="-12" max="12" step="0.5" value="0">
+                <span class="range-val" id="ed-eqLowVal">0 dB</span>
+              </div>
+              <div class="effect-row">
+                <label>Mid (1kHz):</label>
+                <input type="range" id="ed-eqMid" min="-12" max="12" step="0.5" value="0">
+                <span class="range-val" id="ed-eqMidVal">0 dB</span>
+              </div>
+              <div class="effect-row">
+                <label>High (3.2kHz):</label>
+                <input type="range" id="ed-eqHigh" min="-12" max="12" step="0.5" value="0">
+                <span class="range-val" id="ed-eqHighVal">0 dB</span>
+              </div>
+            </div>
+
+            <!-- Compressor controls -->
+            <div class="effect-controls" id="ed-compControls">
+              <div class="effect-section-title">Compressor</div>
+              <div class="effect-row">
+                <label>Threshold:</label>
+                <input type="range" id="ed-compThreshold" min="-60" max="0" step="1" value="-24">
+                <span class="range-val" id="ed-compThresholdVal">-24 dB</span>
+              </div>
+              <div class="effect-row">
+                <label>Ratio:</label>
+                <input type="range" id="ed-compRatio" min="1" max="20" step="0.5" value="4">
+                <span class="range-val" id="ed-compRatioVal">4:1</span>
+              </div>
+              <div class="effect-row">
+                <label>Attack:</label>
+                <input type="range" id="ed-compAttack" min="0" max="200" step="1" value="10">
+                <span class="range-val" id="ed-compAttackVal">10 ms</span>
+              </div>
+              <div class="effect-row">
+                <label>Release:</label>
+                <input type="range" id="ed-compRelease" min="50" max="1000" step="10" value="250">
+                <span class="range-val" id="ed-compReleaseVal">250 ms</span>
+              </div>
+            </div>
+
+            <!-- Reverb controls -->
+            <div class="effect-controls" id="ed-reverbControls">
+              <div class="effect-section-title">Reverb</div>
+              <div class="effect-row">
+                <label>Decay:</label>
+                <input type="range" id="ed-reverbDecay" min="0.5" max="5" step="0.1" value="2">
+                <span class="range-val" id="ed-reverbDecayVal">2.0 s</span>
+              </div>
+              <div class="effect-row">
+                <label>Wet/Dry:</label>
+                <input type="range" id="ed-reverbMix" min="0" max="100" step="1" value="30">
+                <span class="range-val" id="ed-reverbMixVal">30%</span>
+              </div>
+            </div>
+
+            <!-- Delay controls -->
+            <div class="effect-controls" id="ed-delayControls">
+              <div class="effect-section-title">Delay / Echo</div>
+              <div class="effect-row">
+                <label>Time:</label>
+                <input type="range" id="ed-delayTime" min="0" max="1000" step="10" value="300">
+                <span class="range-val" id="ed-delayTimeVal">300 ms</span>
+              </div>
+              <div class="effect-row">
+                <label>Feedback:</label>
+                <input type="range" id="ed-delayFeedback" min="0" max="80" step="1" value="40">
+                <span class="range-val" id="ed-delayFeedbackVal">40%</span>
+              </div>
+              <div class="effect-row">
+                <label>Mix:</label>
+                <input type="range" id="ed-delayMix" min="0" max="100" step="1" value="25">
+                <span class="range-val" id="ed-delayMixVal">25%</span>
+              </div>
+            </div>
+
+            <!-- Distortion controls -->
+            <div class="effect-controls" id="ed-distortControls">
+              <div class="effect-section-title">Distortion</div>
+              <div class="effect-row">
+                <label>Drive:</label>
+                <input type="range" id="ed-distortDrive" min="0" max="100" step="1" value="50">
+                <span class="range-val" id="ed-distortDriveVal">50</span>
+              </div>
+              <div class="effect-row">
+                <label>Tone:</label>
+                <input type="range" id="ed-distortTone" min="200" max="8000" step="100" value="3000">
+                <span class="range-val" id="ed-distortToneVal">3000 Hz</span>
               </div>
             </div>
 

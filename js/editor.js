@@ -44,6 +44,50 @@
   var resultInfo      = document.getElementById('ed-resultInfo');
   var audioPreview    = document.getElementById('ed-audioPreview');
 
+  /* ── Effects DOM references ── */
+  var eqToggle         = document.getElementById('ed-eqToggle');
+  var eqControls       = document.getElementById('ed-eqControls');
+  var eqLowRange       = document.getElementById('ed-eqLow');
+  var eqMidRange       = document.getElementById('ed-eqMid');
+  var eqHighRange      = document.getElementById('ed-eqHigh');
+  var eqLowVal         = document.getElementById('ed-eqLowVal');
+  var eqMidVal         = document.getElementById('ed-eqMidVal');
+  var eqHighVal        = document.getElementById('ed-eqHighVal');
+
+  var compToggle       = document.getElementById('ed-compToggle');
+  var compControls     = document.getElementById('ed-compControls');
+  var compThreshRange  = document.getElementById('ed-compThreshold');
+  var compRatioRange   = document.getElementById('ed-compRatio');
+  var compAttackRange  = document.getElementById('ed-compAttack');
+  var compReleaseRange = document.getElementById('ed-compRelease');
+  var compThreshVal    = document.getElementById('ed-compThresholdVal');
+  var compRatioVal     = document.getElementById('ed-compRatioVal');
+  var compAttackVal    = document.getElementById('ed-compAttackVal');
+  var compReleaseVal   = document.getElementById('ed-compReleaseVal');
+
+  var reverbToggle     = document.getElementById('ed-reverbToggle');
+  var reverbControls   = document.getElementById('ed-reverbControls');
+  var reverbDecayRange = document.getElementById('ed-reverbDecay');
+  var reverbMixRange   = document.getElementById('ed-reverbMix');
+  var reverbDecayVal   = document.getElementById('ed-reverbDecayVal');
+  var reverbMixVal     = document.getElementById('ed-reverbMixVal');
+
+  var delayToggle      = document.getElementById('ed-delayToggle');
+  var delayControls    = document.getElementById('ed-delayControls');
+  var delayTimeRange   = document.getElementById('ed-delayTime');
+  var delayFbRange     = document.getElementById('ed-delayFeedback');
+  var delayMixRange    = document.getElementById('ed-delayMix');
+  var delayTimeVal     = document.getElementById('ed-delayTimeVal');
+  var delayFbVal       = document.getElementById('ed-delayFeedbackVal');
+  var delayMixVal      = document.getElementById('ed-delayMixVal');
+
+  var distortToggle    = document.getElementById('ed-distortToggle');
+  var distortControls  = document.getElementById('ed-distortControls');
+  var distortDriveRange = document.getElementById('ed-distortDrive');
+  var distortToneRange = document.getElementById('ed-distortTone');
+  var distortDriveVal  = document.getElementById('ed-distortDriveVal');
+  var distortToneVal   = document.getElementById('ed-distortToneVal');
+
   /* ── Constants ── */
   var TRACK_COLORS = ['#e94560', '#4ecca3', '#4285f4', '#ffa726', '#ab47bc', '#26c6da'];
 
@@ -70,6 +114,17 @@
 
   /* ── Drag state ── */
   var draggedFileId = null;
+
+  /* ── Effects state ── */
+  var fxEnabled = { eq: false, compressor: false, reverb: false, delay: false, distortion: false };
+  var masterGain = null;
+  var fxNodes = {
+    eqLow: null, eqMid: null, eqHigh: null,
+    compressor: null,
+    reverbConvolver: null, reverbDryGain: null, reverbWetGain: null,
+    delayNode: null, delayFeedbackGain: null, delayDryGain: null, delayWetGain: null,
+    distortShaper: null, distortToneFilter: null
+  };
 
   function sp(pct, text) { setProgress(progressFill, progressTextEl, pct, text); }
 
@@ -105,6 +160,35 @@
       if (trackSlots[i].assignedFileId !== null) out.push(trackSlots[i]);
     }
     return out;
+  }
+
+  /* ═══════════════════════════════════════════════
+     Audio Effect Utilities
+     ═══════════════════════════════════════════════ */
+
+  function generateReverbIR(ctx, decayTime) {
+    var sampleRate = ctx.sampleRate;
+    var length = Math.floor(sampleRate * decayTime);
+    var irBuffer = ctx.createBuffer(2, length, sampleRate);
+    var leftCh = irBuffer.getChannelData(0);
+    var rightCh = irBuffer.getChannelData(1);
+    for (var i = 0; i < length; i++) {
+      var envelope = Math.exp(-3 * (i / sampleRate) / decayTime);
+      leftCh[i] = (Math.random() * 2 - 1) * envelope;
+      rightCh[i] = (Math.random() * 2 - 1) * envelope;
+    }
+    return irBuffer;
+  }
+
+  function generateDistortionCurve(drive) {
+    var samples = 8192;
+    var curve = new Float32Array(samples);
+    var k = drive * 2;
+    for (var i = 0; i < samples; i++) {
+      var x = (i * 2) / samples - 1;
+      curve[i] = k === 0 ? x : ((1 + k) * x) / (1 + k * Math.abs(x));
+    }
+    return curve;
   }
 
   /* ═══════════════════════════════════════════════
@@ -891,6 +975,233 @@
   });
 
   /* ═══════════════════════════════════════════════
+     Effects — Toggle & Parameter Handlers
+     ═══════════════════════════════════════════════ */
+
+  function setupEffectToggle(btn, panel, fxKey) {
+    btn.addEventListener('click', function() {
+      btn.classList.toggle('active-effect');
+      panel.classList.toggle('active');
+      fxEnabled[fxKey] = btn.classList.contains('active-effect');
+      if (isPlaying) { stopPlayback(); startPlayback(); }
+    });
+  }
+
+  setupEffectToggle(eqToggle, eqControls, 'eq');
+  setupEffectToggle(compToggle, compControls, 'compressor');
+  setupEffectToggle(reverbToggle, reverbControls, 'reverb');
+  setupEffectToggle(delayToggle, delayControls, 'delay');
+  setupEffectToggle(distortToggle, distortControls, 'distortion');
+
+  function setupSlider(rangeEl, valEl, formatFn, liveParamFn) {
+    rangeEl.addEventListener('input', function() {
+      valEl.textContent = formatFn(rangeEl.value);
+      if (liveParamFn) liveParamFn(parseFloat(rangeEl.value));
+    });
+  }
+
+  // EQ sliders
+  setupSlider(eqLowRange, eqLowVal,
+    function(v) { return parseFloat(v).toFixed(1) + ' dB'; },
+    function(v) { if (fxNodes.eqLow) fxNodes.eqLow.gain.value = v; });
+  setupSlider(eqMidRange, eqMidVal,
+    function(v) { return parseFloat(v).toFixed(1) + ' dB'; },
+    function(v) { if (fxNodes.eqMid) fxNodes.eqMid.gain.value = v; });
+  setupSlider(eqHighRange, eqHighVal,
+    function(v) { return parseFloat(v).toFixed(1) + ' dB'; },
+    function(v) { if (fxNodes.eqHigh) fxNodes.eqHigh.gain.value = v; });
+
+  // Compressor sliders
+  setupSlider(compThreshRange, compThreshVal,
+    function(v) { return v + ' dB'; },
+    function(v) { if (fxNodes.compressor) fxNodes.compressor.threshold.value = v; });
+  setupSlider(compRatioRange, compRatioVal,
+    function(v) { return parseFloat(v).toFixed(1) + ':1'; },
+    function(v) { if (fxNodes.compressor) fxNodes.compressor.ratio.value = v; });
+  setupSlider(compAttackRange, compAttackVal,
+    function(v) { return v + ' ms'; },
+    function(v) { if (fxNodes.compressor) fxNodes.compressor.attack.value = v / 1000; });
+  setupSlider(compReleaseRange, compReleaseVal,
+    function(v) { return v + ' ms'; },
+    function(v) { if (fxNodes.compressor) fxNodes.compressor.release.value = v / 1000; });
+
+  // Reverb sliders
+  setupSlider(reverbDecayRange, reverbDecayVal,
+    function(v) { return parseFloat(v).toFixed(1) + ' s'; }, null);
+  reverbDecayRange.addEventListener('change', function() {
+    if (fxNodes.reverbConvolver && playCtx) {
+      fxNodes.reverbConvolver.buffer = generateReverbIR(playCtx, parseFloat(reverbDecayRange.value));
+    }
+  });
+  setupSlider(reverbMixRange, reverbMixVal,
+    function(v) { return v + '%'; },
+    function(v) {
+      var wet = v / 100;
+      if (fxNodes.reverbDryGain) fxNodes.reverbDryGain.gain.value = 1 - wet;
+      if (fxNodes.reverbWetGain) fxNodes.reverbWetGain.gain.value = wet;
+    });
+
+  // Delay sliders
+  setupSlider(delayTimeRange, delayTimeVal,
+    function(v) { return v + ' ms'; },
+    function(v) { if (fxNodes.delayNode) fxNodes.delayNode.delayTime.value = v / 1000; });
+  setupSlider(delayFbRange, delayFbVal,
+    function(v) { return v + '%'; },
+    function(v) { if (fxNodes.delayFeedbackGain) fxNodes.delayFeedbackGain.gain.value = v / 100; });
+  setupSlider(delayMixRange, delayMixVal,
+    function(v) { return v + '%'; },
+    function(v) {
+      var wet = v / 100;
+      if (fxNodes.delayDryGain) fxNodes.delayDryGain.gain.value = 1 - wet;
+      if (fxNodes.delayWetGain) fxNodes.delayWetGain.gain.value = wet;
+    });
+
+  // Distortion sliders
+  setupSlider(distortDriveRange, distortDriveVal,
+    function(v) { return v; },
+    function(v) {
+      if (fxNodes.distortShaper) fxNodes.distortShaper.curve = generateDistortionCurve(parseFloat(v));
+    });
+  setupSlider(distortToneRange, distortToneVal,
+    function(v) { return v + ' Hz'; },
+    function(v) { if (fxNodes.distortToneFilter) fxNodes.distortToneFilter.frequency.value = v; });
+
+  /* ═══════════════════════════════════════════════
+     Effects Chain — Build master bus
+     ═══════════════════════════════════════════════ */
+
+  function buildEffectsChain(ctx) {
+    // Reset node references
+    for (var key in fxNodes) fxNodes[key] = null;
+
+    masterGain = ctx.createGain();
+    masterGain.gain.value = 1.0;
+    var currentNode = masterGain;
+
+    // EQ: 3 BiquadFilters in series
+    if (fxEnabled.eq) {
+      var eqLow = ctx.createBiquadFilter();
+      eqLow.type = 'lowshelf';
+      eqLow.frequency.value = 320;
+      eqLow.gain.value = parseFloat(eqLowRange.value);
+
+      var eqMid = ctx.createBiquadFilter();
+      eqMid.type = 'peaking';
+      eqMid.frequency.value = 1000;
+      eqMid.Q.value = 1.0;
+      eqMid.gain.value = parseFloat(eqMidRange.value);
+
+      var eqHigh = ctx.createBiquadFilter();
+      eqHigh.type = 'highshelf';
+      eqHigh.frequency.value = 3200;
+      eqHigh.gain.value = parseFloat(eqHighRange.value);
+
+      currentNode.connect(eqLow);
+      eqLow.connect(eqMid);
+      eqMid.connect(eqHigh);
+      currentNode = eqHigh;
+
+      fxNodes.eqLow = eqLow;
+      fxNodes.eqMid = eqMid;
+      fxNodes.eqHigh = eqHigh;
+    }
+
+    // Compressor
+    if (fxEnabled.compressor) {
+      var comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = parseFloat(compThreshRange.value);
+      comp.ratio.value = parseFloat(compRatioRange.value);
+      comp.attack.value = parseFloat(compAttackRange.value) / 1000;
+      comp.release.value = parseFloat(compReleaseRange.value) / 1000;
+      comp.knee.value = 6;
+
+      currentNode.connect(comp);
+      currentNode = comp;
+      fxNodes.compressor = comp;
+    }
+
+    // Distortion: WaveShaperNode + tone filter
+    if (fxEnabled.distortion) {
+      var shaper = ctx.createWaveShaper();
+      shaper.curve = generateDistortionCurve(parseFloat(distortDriveRange.value));
+      shaper.oversample = '4x';
+
+      var toneFilter = ctx.createBiquadFilter();
+      toneFilter.type = 'lowpass';
+      toneFilter.frequency.value = parseFloat(distortToneRange.value);
+      toneFilter.Q.value = 0.7;
+
+      currentNode.connect(shaper);
+      shaper.connect(toneFilter);
+      currentNode = toneFilter;
+
+      fxNodes.distortShaper = shaper;
+      fxNodes.distortToneFilter = toneFilter;
+    }
+
+    // Delay: parallel wet/dry with feedback loop
+    if (fxEnabled.delay) {
+      var delayMerger = ctx.createGain();
+      var wetMix = parseFloat(delayMixRange.value) / 100;
+
+      var dryGain = ctx.createGain();
+      dryGain.gain.value = 1 - wetMix;
+
+      var delayNode = ctx.createDelay(2.0);
+      delayNode.delayTime.value = parseFloat(delayTimeRange.value) / 1000;
+
+      var feedbackGain = ctx.createGain();
+      feedbackGain.gain.value = parseFloat(delayFbRange.value) / 100;
+
+      var wetGain = ctx.createGain();
+      wetGain.gain.value = wetMix;
+
+      currentNode.connect(dryGain);
+      dryGain.connect(delayMerger);
+      currentNode.connect(delayNode);
+      delayNode.connect(feedbackGain);
+      feedbackGain.connect(delayNode);
+      delayNode.connect(wetGain);
+      wetGain.connect(delayMerger);
+      currentNode = delayMerger;
+
+      fxNodes.delayNode = delayNode;
+      fxNodes.delayFeedbackGain = feedbackGain;
+      fxNodes.delayDryGain = dryGain;
+      fxNodes.delayWetGain = wetGain;
+    }
+
+    // Reverb: ConvolverNode with wet/dry mix
+    if (fxEnabled.reverb) {
+      var reverbMerger = ctx.createGain();
+      var wetMixR = parseFloat(reverbMixRange.value) / 100;
+
+      var dryGainR = ctx.createGain();
+      dryGainR.gain.value = 1 - wetMixR;
+
+      var convolver = ctx.createConvolver();
+      convolver.buffer = generateReverbIR(ctx, parseFloat(reverbDecayRange.value));
+
+      var wetGainR = ctx.createGain();
+      wetGainR.gain.value = wetMixR;
+
+      currentNode.connect(dryGainR);
+      dryGainR.connect(reverbMerger);
+      currentNode.connect(convolver);
+      convolver.connect(wetGainR);
+      wetGainR.connect(reverbMerger);
+      currentNode = reverbMerger;
+
+      fxNodes.reverbConvolver = convolver;
+      fxNodes.reverbDryGain = dryGainR;
+      fxNodes.reverbWetGain = wetGainR;
+    }
+
+    currentNode.connect(ctx.destination);
+    return masterGain;
+  }
+
+  /* ═══════════════════════════════════════════════
      Playback — Web Audio mixing graph
      ═══════════════════════════════════════════════ */
 
@@ -903,6 +1214,8 @@
       trackSlots[i].gainNode = null;
       trackSlots[i].panNode = null;
     }
+    masterGain = null;
+    for (var key in fxNodes) fxNodes[key] = null;
     if (playCtx) {
       playCtx.close();
       playCtx = null;
@@ -927,6 +1240,9 @@
     var playDuration = endTimeSec - startTimeSec;
     if (playDuration <= 0) return;
 
+    // Build master bus effects chain
+    var chainInput = buildEffectsChain(playCtx);
+
     for (var i = 0; i < assigned.length; i++) {
       var slot = assigned[i];
       var lf = getLibFile(slot.assignedFileId);
@@ -943,7 +1259,7 @@
 
       source.connect(gain);
       gain.connect(panner);
-      panner.connect(playCtx.destination);
+      panner.connect(chainInput);
 
       slot.sourceNode = source;
       slot.gainNode = gain;
@@ -1019,12 +1335,11 @@
       var firstLf = getLibFile(assigned[0].assignedFileId);
       var sampleRate = firstLf.buffer.sampleRate;
       var numChannels = 2;
-      var totalSamples = Math.floor(totalDuration * sampleRate);
 
-      var trimStartSample = Math.floor(trimStartRatio * totalSamples);
-      var trimEndSample = Math.floor(trimEndRatio * totalSamples);
-      var outputLength = trimEndSample - trimStartSample;
-      if (outputLength <= 0) {
+      var trimStartSec = trimStartRatio * totalDuration;
+      var trimEndSec = trimEndRatio * totalDuration;
+      var outputDurationSec = trimEndSec - trimStartSec;
+      if (outputDurationSec <= 0) {
         showError(errorBox, 'Trim selection is empty.');
         exportBtn.disabled = false;
         exportBtn.textContent = 'Export Mixed MP3';
@@ -1032,71 +1347,97 @@
         return;
       }
 
-      sp(10, 'Mixing ' + assigned.length + ' track' + (assigned.length !== 1 ? 's' : '') + '...');
+      // Extra tail time for reverb/delay decay
+      var tailSec = 0;
+      if (fxEnabled.reverb) tailSec = Math.max(tailSec, parseFloat(reverbDecayRange.value));
+      if (fxEnabled.delay) {
+        var fb = parseFloat(delayFbRange.value) / 100;
+        var dt = parseFloat(delayTimeRange.value) / 1000;
+        if (fb > 0 && dt > 0) tailSec = Math.max(tailSec, dt * Math.min(10, 1 / (1 - fb)));
+      }
 
-      var outLeft = new Float32Array(outputLength);
-      var outRight = new Float32Array(outputLength);
+      var renderDurationSec = outputDurationSec + tailSec;
+      var renderLength = Math.ceil(renderDurationSec * sampleRate);
+      var outputSamples = Math.floor(outputDurationSec * sampleRate);
 
-      for (var t = 0; t < assigned.length; t++) {
-        var slot = assigned[t];
+      sp(10, 'Building offline audio graph...');
+
+      var offCtx = new OfflineAudioContext(numChannels, renderLength, sampleRate);
+      var chainInput = buildEffectsChain(offCtx);
+
+      // Per-track sources
+      for (var i = 0; i < assigned.length; i++) {
+        var slot = assigned[i];
         var lf = getLibFile(slot.assignedFileId);
         if (!lf) continue;
 
-        var vol = slot.volume;
-        var pan = slot.pan;
-        var theta = (pan + 1) * Math.PI / 4;
-        var leftGain = vol * Math.cos(theta);
-        var rightGain = vol * Math.sin(theta);
+        var source = offCtx.createBufferSource();
+        source.buffer = lf.buffer;
 
-        var buf = lf.buffer;
-        var srcLeft = buf.getChannelData(0);
-        var srcRight = buf.numberOfChannels >= 2 ? buf.getChannelData(1) : srcLeft;
-        var trackSamples = buf.length;
+        var gain = offCtx.createGain();
+        gain.gain.value = slot.volume;
 
-        for (var i = 0; i < outputLength; i++) {
-          var globalIdx = trimStartSample + i;
-          if (globalIdx < trackSamples) {
-            outLeft[i] += srcLeft[globalIdx] * leftGain;
-            outRight[i] += srcRight[globalIdx] * rightGain;
-          }
+        var panner = offCtx.createStereoPanner();
+        panner.pan.value = slot.pan;
+
+        source.connect(gain);
+        gain.connect(panner);
+        panner.connect(chainInput);
+
+        var trackAvailDur = Math.max(0, lf.buffer.duration - trimStartSec);
+        if (trackAvailDur > 0) {
+          source.start(0, trimStartSec, Math.min(outputDurationSec, trackAvailDur));
         }
-
-        sp(10 + Math.floor(((t + 1) / assigned.length) * 20),
-          'Mixed track ' + (t + 1) + '/' + assigned.length);
       }
 
-      // Fades
-      sp(30, 'Applying fades...');
+      // Fades via GainNode automation
       var fadeInSec = parseFloat(fadeInRange.value) || 0;
       var fadeOutSec = parseFloat(fadeOutRange.value) || 0;
-      var fadeInSamples = Math.floor(fadeInSec * sampleRate);
-      var fadeOutSamples = Math.floor(fadeOutSec * sampleRate);
-
-      for (var i = 0; i < outputLength; i++) {
-        var mult = 1;
-        if (i < fadeInSamples) mult = i / fadeInSamples;
-        if (i >= outputLength - fadeOutSamples) {
-          mult = Math.min(mult, (outputLength - i) / fadeOutSamples);
+      if (fadeInSec > 0) {
+        masterGain.gain.setValueAtTime(0, 0);
+        masterGain.gain.linearRampToValueAtTime(1, fadeInSec);
+      }
+      if (fadeOutSec > 0) {
+        var fadeOutStart = outputDurationSec - fadeOutSec;
+        if (fadeOutStart > 0) {
+          masterGain.gain.setValueAtTime(1, fadeOutStart);
+          masterGain.gain.linearRampToValueAtTime(0, outputDurationSec);
         }
-        if (mult < 1) {
-          outLeft[i] *= mult;
-          outRight[i] *= mult;
+      }
+
+      sp(20, 'Rendering ' + assigned.length + ' track' + (assigned.length !== 1 ? 's' : '') + ' with effects...');
+
+      var renderedBuffer = await offCtx.startRendering();
+
+      sp(60, 'Encoding to MP3...');
+
+      var outLeft = renderedBuffer.getChannelData(0);
+      var outRight = renderedBuffer.numberOfChannels >= 2
+        ? renderedBuffer.getChannelData(1) : renderedBuffer.getChannelData(0);
+
+      // Find end of audible content (trim silence from effect tails)
+      var encodeSamples = outputSamples;
+      if (tailSec > 0) {
+        var silenceThreshold = 0.001;
+        for (var s = Math.min(renderedBuffer.length, renderLength) - 1; s >= outputSamples; s--) {
+          if (Math.abs(outLeft[s]) > silenceThreshold || Math.abs(outRight[s]) > silenceThreshold) {
+            encodeSamples = s + 1;
+            break;
+          }
         }
       }
 
       // Clamp
-      for (var i = 0; i < outputLength; i++) {
-        if (outLeft[i] > 1) outLeft[i] = 1;
-        else if (outLeft[i] < -1) outLeft[i] = -1;
-        if (outRight[i] > 1) outRight[i] = 1;
-        else if (outRight[i] < -1) outRight[i] = -1;
+      var encL = outLeft.subarray(0, encodeSamples);
+      var encR = outRight.subarray(0, encodeSamples);
+      for (var i = 0; i < encodeSamples; i++) {
+        if (encL[i] > 1) encL[i] = 1; else if (encL[i] < -1) encL[i] = -1;
+        if (encR[i] > 1) encR[i] = 1; else if (encR[i] < -1) encR[i] = -1;
       }
 
-      sp(35, 'Encoding to MP3...');
-
-      var channels = [outLeft, outRight];
-      var mp3Data = await encodeMP3(channels, sampleRate, numChannels, outputLength, function(ratio) {
-        sp(35 + Math.floor(ratio * 60), 'Encoding to MP3... ' + Math.floor(ratio * 100) + '%');
+      var channels = [encL, encR];
+      var mp3Data = await encodeMP3(channels, sampleRate, numChannels, encodeSamples, function(ratio) {
+        sp(60 + Math.floor(ratio * 35), 'Encoding to MP3... ' + Math.floor(ratio * 100) + '%');
       });
 
       sp(96, 'Finalizing...');
@@ -1111,7 +1452,7 @@
       dlLink.download = outName;
       audioPreview.src = url;
 
-      var durationSec = outputLength / sampleRate;
+      var durationSec = encodeSamples / sampleRate;
       var mins = Math.floor(durationSec / 60);
       var secs = Math.floor(durationSec % 60);
       resultInfo.textContent = outName + ' \u2014 ' + formatSize(blob.size) +
@@ -1124,6 +1465,8 @@
       console.error(err);
       showError(errorBox, 'Export failed: ' + err.message);
     } finally {
+      masterGain = null;
+      for (var key in fxNodes) fxNodes[key] = null;
       exportBtn.disabled = false;
       exportBtn.textContent = 'Export Mixed MP3';
       setTimeout(function() { progressWrap.classList.remove('active'); }, 1500);
