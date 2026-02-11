@@ -588,6 +588,26 @@ button.action-btn:disabled {
    MP3 Editor
    ═══════════════════════════════════════════════ */
 
+/* Container width override for editor tab */
+.container.editor-active {
+  max-width: 1200px;
+  transition: max-width var(--transition-normal);
+}
+
+/* ── Two-panel Layout ── */
+.editor-layout {
+  display: flex;
+  gap: 0;
+  margin: 0 -24px -24px;
+  min-height: 500px;
+}
+
+.editor-main {
+  flex: 1;
+  min-width: 0;
+  padding: 0 24px 24px 0;
+}
+
 .editor-workspace {
   display: none;
 }
@@ -596,62 +616,274 @@ button.action-btn:disabled {
   display: block;
 }
 
-/* ── Track List ── */
-.track-list {
-  margin-bottom: 20px;
+/* ── File Library Panel (right side) ── */
+.editor-file-panel {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-input);
+  border-left: 1px solid var(--border-subtle);
+  border-radius: 0 0 var(--radius-xl) 0;
 }
 
-.track-list-title {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
+.file-panel-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.file-panel-header h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  letter-spacing: -0.01em;
+}
+
+.editor-file-panel .upload-area-compact {
+  padding: 18px 14px;
+  border-radius: var(--radius-md);
   margin-bottom: 8px;
 }
 
-.track-list-items {
-  list-style: none;
-  max-height: 320px;
+.editor-file-panel .upload-area-compact::before {
+  font-size: 1.3rem;
+  margin-bottom: 4px;
+}
+
+.editor-file-panel .upload-area-compact .upload-label {
+  font-size: 0.82rem;
+}
+
+.editor-file-panel .upload-alt {
+  margin-bottom: 0;
+  font-size: 0.78rem;
+}
+
+.editor-file-panel .gdrive-notice {
+  margin-bottom: 0;
+  margin-top: 8px;
+}
+
+.file-panel-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-medium) transparent;
+}
+
+.file-panel-list::-webkit-scrollbar { width: 4px; }
+.file-panel-list::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 2px;
+}
+
+/* File library items (draggable) */
+.file-panel-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: grab;
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+
+.file-panel-item:active {
+  cursor: grabbing;
+}
+
+.file-panel-item:hover:not(.dragging) {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-primary);
+}
+
+.file-panel-item.dragging {
+  opacity: 0.4;
+  transform: scale(0.97);
+}
+
+.file-panel-icon {
+  font-size: 1.1rem;
+  color: var(--accent-primary);
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+}
+
+.file-panel-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-panel-name {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-panel-meta {
+  font-size: 0.7rem;
+  color: var(--text-dimmed);
+  margin-top: 2px;
+}
+
+.file-panel-remove {
+  background: none;
+  border: none;
+  color: var(--text-dimmed);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0 2px;
+  width: auto;
+  margin: 0;
+  line-height: 1;
+  transition: color var(--transition-fast);
+}
+
+.file-panel-remove:hover {
+  color: var(--accent-primary);
+}
+
+.file-panel-footer {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 0.75rem;
+  color: var(--text-dimmed);
+  text-align: center;
+}
+
+/* Drag-in-progress feedback */
+body.drag-in-progress .track-drop-zone {
+  border-color: var(--accent-green);
+  background: rgba(78, 204, 163, 0.04);
+}
+
+body.drag-in-progress .track-drop-zone .drop-zone-text {
+  color: var(--accent-green);
+}
+
+/* ── Track Toolbar ── */
+.editor-track-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.editor-add-track-btn {
+  padding: 7px 16px;
+  border: 1px dashed var(--border-medium);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  width: auto;
+  margin: 0;
+}
+
+.editor-add-track-btn:hover {
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+  background: var(--accent-green-glow);
+}
+
+.editor-track-count {
+  font-size: 0.8rem;
+  color: var(--text-dimmed);
+}
+
+/* ── Track Rows ── */
+.editor-tracks {
+  margin-bottom: 16px;
+  max-height: 480px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--border-medium) transparent;
 }
 
-.track-list-items::-webkit-scrollbar { width: 4px; }
-.track-list-items::-webkit-scrollbar-thumb {
+.editor-tracks::-webkit-scrollbar { width: 4px; }
+.editor-tracks::-webkit-scrollbar-thumb {
   background: var(--border-medium);
   border-radius: 2px;
 }
 
-.track-row {
-  background: var(--bg-input);
-  border: 1px solid var(--border-subtle);
-  border-left: 3px solid var(--track-color, var(--accent-primary));
-  border-radius: var(--radius-sm);
+.editor-track-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
   padding: 10px 12px;
   margin-bottom: 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--track-color, var(--text-dimmed));
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
-.track-header {
+/* Left controls: color dot, number, reorder, remove */
+.track-left-controls {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+  justify-content: center;
+  gap: 4px;
+  width: 40px;
+  flex-shrink: 0;
 }
 
 .track-color-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--track-color, var(--accent-primary));
+  background: var(--track-color, var(--text-dimmed));
   flex-shrink: 0;
 }
 
-.track-name {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.track-number {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.track-reorder-btns {
+  display: flex;
+  gap: 2px;
+}
+
+.track-reorder-btns button {
+  background: none;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-dimmed);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 1px 5px;
+  border-radius: 3px;
+  width: auto;
+  margin: 0;
+  line-height: 1.2;
+  transition: all var(--transition-fast);
+}
+
+.track-reorder-btns button:hover:not(:disabled) {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+.track-reorder-btns button:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
 .track-remove-btn {
@@ -659,8 +891,8 @@ button.action-btn:disabled {
   border: none;
   color: var(--accent-primary);
   cursor: pointer;
-  font-size: 1.1rem;
-  padding: 0 4px;
+  font-size: 1rem;
+  padding: 0 2px;
   width: auto;
   margin: 0;
   line-height: 1;
@@ -671,30 +903,122 @@ button.action-btn:disabled {
   color: var(--accent-primary-hover);
 }
 
-.track-controls {
+/* Center: drop zone or assigned waveform */
+.track-center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 60px;
+}
+
+.track-drop-zone {
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.78rem;
-  color: var(--text-muted);
+  justify-content: center;
+  border: 2px dashed var(--border-medium);
+  border-radius: var(--radius-sm);
+  background: var(--bg-deepest);
+  transition: all var(--transition-fast);
 }
 
-.track-controls label {
-  font-weight: 600;
-  min-width: 24px;
-  color: var(--text-muted);
+.track-drop-zone.drag-over {
+  border-color: var(--accent-green);
+  border-style: solid;
+  background: rgba(78, 204, 163, 0.08);
 }
 
-.track-controls input[type="range"] {
+.drop-zone-text {
+  font-size: 0.8rem;
+  color: var(--text-dimmed);
+  pointer-events: none;
+}
+
+.track-assigned {
   flex: 1;
-  max-width: 100px;
+  display: flex;
+  flex-direction: column;
+}
+
+.track-info-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  padding: 0 2px;
+}
+
+.track-name {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track-unassign-btn {
+  background: none;
+  border: none;
+  color: var(--text-dimmed);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0 4px;
+  width: auto;
+  margin: 0;
+  line-height: 1;
+  transition: color var(--transition-fast);
+}
+
+.track-unassign-btn:hover {
+  color: var(--accent-primary);
+}
+
+.track-mini-canvas {
+  width: 100%;
+  height: 50px;
+  display: block;
+  background: var(--bg-deepest);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+/* Right controls: vol + pan sliders */
+.track-right-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 150px;
+  flex-shrink: 0;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.track-ctrl-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.track-ctrl-row label {
+  font-weight: 600;
+  min-width: 26px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.track-ctrl-row input[type="range"] {
+  flex: 1;
+  max-width: 80px;
   accent-color: var(--track-color, var(--accent-primary));
 }
 
 .track-vol-val,
 .track-pan-val {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   min-width: 32px;
   text-align: right;
   color: var(--accent-green);
@@ -1067,6 +1391,40 @@ button.action-btn.separator-btn:hover:not(:disabled) {
    Responsive
    ═══════════════════════════════════════════════ */
 
+/* ── Editor responsive: stack panels at 900px ── */
+@media (max-width: 900px) {
+  .editor-layout {
+    flex-direction: column;
+    margin: 0 -12px -12px;
+  }
+
+  .editor-main {
+    padding: 0 0 16px;
+  }
+
+  .editor-file-panel {
+    width: 100%;
+    max-height: 260px;
+    border-left: none;
+    border-top: 1px solid var(--border-subtle);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  }
+
+  .editor-track-row {
+    flex-wrap: wrap;
+  }
+
+  .track-right-controls {
+    width: 100%;
+    flex-direction: row;
+    gap: 12px;
+  }
+
+  .track-ctrl-row input[type="range"] {
+    max-width: none;
+  }
+}
+
 @media (max-width: 600px) {
   body {
     padding: 20px 12px 40px;
@@ -1097,15 +1455,11 @@ button.action-btn.separator-btn:hover:not(:disabled) {
     flex-wrap: wrap;
   }
 
-  .track-controls {
-    flex-wrap: wrap;
-  }
-
-  .track-controls input[type="range"] {
-    max-width: none;
-  }
-
   .waveform-lane canvas {
     height: 70px;
+  }
+
+  .track-mini-canvas {
+    height: 40px;
   }
 }

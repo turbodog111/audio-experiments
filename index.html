@@ -128,120 +128,135 @@
     <!-- ════════════════════════════════════════════ -->
     <div class="tab-panel" id="tab-editor">
       <h2>MP3 Editor</h2>
-      <p class="subtitle">Upload multiple MP3s, mix with volume &amp; pan controls, trim, fade, and export.</p>
+      <p class="subtitle">Upload MP3s to the file library, drag them onto tracks, mix with volume &amp; pan, trim, fade, and export.</p>
 
-      <div class="upload-area" id="ed-uploadArea">
-        <input type="file" id="ed-fileInput" accept=".mp3,audio/mpeg" multiple>
-        <p class="upload-label">Click or drag MP3 files here (add more anytime)</p>
-        <p class="file-name" id="ed-fileName"></p>
-      </div>
-      <div class="upload-alt">
-        or <button class="gdrive-btn" id="ed-gdriveBtn" disabled>Import from Google Drive</button>
-      </div>
+      <div class="editor-layout">
+        <!-- ── Left: Workspace ── -->
+        <div class="editor-main">
+          <div class="error" id="ed-errorBox"></div>
 
-      <div class="gdrive-notice" id="ed-gdriveNotice"></div>
-
-      <!-- Track list -->
-      <div class="track-list" id="ed-trackList" style="display:none;">
-        <p class="track-list-title">Tracks: <span id="ed-trackCount">0</span></p>
-        <ul class="track-list-items" id="ed-trackListItems"></ul>
-      </div>
-
-      <div class="error" id="ed-errorBox"></div>
-
-      <div class="editor-workspace" id="ed-workspace">
-        <!-- Multi-track waveform -->
-        <div class="waveform-container" id="ed-waveformContainer">
-          <div class="waveform-lanes" id="ed-waveformLanes"></div>
-          <div class="trim-overlay-left" id="ed-overlayLeft"></div>
-          <div class="trim-overlay-right" id="ed-overlayRight"></div>
-          <div class="trim-handle trim-handle-left" id="ed-handleLeft"></div>
-          <div class="trim-handle trim-handle-right" id="ed-handleRight"></div>
-          <div class="playhead" id="ed-playhead"></div>
-        </div>
-
-        <div class="trim-times">
-          <span>Start: <span class="time-green" id="ed-trimStart">0:00.0</span></span>
-          <span>Selection: <span id="ed-trimDuration">0:00.0</span></span>
-          <span>End: <span class="time-red" id="ed-trimEnd">0:00.0</span></span>
-        </div>
-
-        <!-- Toolbar -->
-        <div class="editor-toolbar">
-          <button id="ed-playToggle">Play (Space)</button>
-          <button id="ed-resetBtn">Reset trim</button>
-          <button id="ed-fadeToggle">Fade In/Out</button>
-        </div>
-
-        <!-- Fade controls -->
-        <div class="effect-controls" id="ed-fadeControls">
-          <div class="effect-row">
-            <label>Fade in:</label>
-            <input type="range" id="ed-fadeIn" min="0" max="10" step="0.1" value="0">
-            <span class="range-val" id="ed-fadeInVal">0.0s</span>
-          </div>
-          <div class="effect-row">
-            <label>Fade out:</label>
-            <input type="range" id="ed-fadeOut" min="0" max="10" step="0.1" value="0">
-            <span class="range-val" id="ed-fadeOutVal">0.0s</span>
-          </div>
-        </div>
-
-        <!-- Export -->
-        <button class="action-btn" id="ed-exportBtn">Export Mixed MP3</button>
-
-        <div class="progress-wrap" id="ed-progressWrap">
-          <div class="progress-bar"><div class="fill" id="ed-progressFill"></div></div>
-          <p class="progress-text" id="ed-progressText">Starting...</p>
-        </div>
-
-        <div class="result" id="ed-result">
-          <a id="ed-downloadLink" href="#" download="edited.mp3">Download Edited MP3</a>
-          <p class="info" id="ed-resultInfo"></p>
-          <div class="preview">
-            <p class="preview-label">Preview:</p>
-            <audio id="ed-audioPreview" controls></audio>
-          </div>
-        </div>
-
-        <!-- ── Stem Separation ── -->
-        <div class="separator-section" id="ed-separatorSection">
-          <div class="section-divider"></div>
-          <h3 class="section-heading">Stem Separation</h3>
-          <p class="section-subtitle">Separate vocals from instrumental using AI (Demucs v4 via Hugging Face)</p>
-
-          <button class="action-btn separator-btn" id="sep-startBtn" disabled>
-            Load an MP3 above first
-          </button>
-
-          <div class="separator-status" id="sep-status" style="display:none;">
-            <div class="separator-status-icon" id="sep-statusIcon"></div>
-            <span id="sep-statusText">Connecting to AI service...</span>
+          <!-- Track toolbar -->
+          <div class="editor-track-toolbar">
+            <button class="editor-add-track-btn" id="ed-addTrackBtn">+ Add Track</button>
+            <span class="editor-track-count" id="ed-trackCount">0 tracks</span>
           </div>
 
-          <div class="progress-wrap" id="sep-progressWrap">
-            <div class="progress-bar"><div class="fill" id="sep-progressFill"></div></div>
-            <p class="progress-text" id="sep-progressText"></p>
-          </div>
+          <!-- Track rows (built by JS) -->
+          <div class="editor-tracks" id="ed-tracksContainer"></div>
 
-          <div class="error" id="sep-errorBox"></div>
-
-          <div class="separator-results" id="sep-results" style="display:none;">
-            <div class="stem-card">
-              <h4>Vocals</h4>
-              <audio id="sep-vocalsAudio" controls></audio>
-              <a class="stem-download-btn" id="sep-vocalsDownload" href="#" download="vocals.mp3">
-                Download Vocals
-              </a>
+          <!-- Global timeline waveform -->
+          <div class="editor-workspace" id="ed-workspace">
+            <div class="waveform-container" id="ed-waveformContainer">
+              <div class="waveform-lanes" id="ed-waveformLanes"></div>
+              <div class="trim-overlay-left" id="ed-overlayLeft"></div>
+              <div class="trim-overlay-right" id="ed-overlayRight"></div>
+              <div class="trim-handle trim-handle-left" id="ed-handleLeft"></div>
+              <div class="trim-handle trim-handle-right" id="ed-handleRight"></div>
+              <div class="playhead" id="ed-playhead"></div>
             </div>
-            <div class="stem-card">
-              <h4>Instrumental</h4>
-              <audio id="sep-instrumentalAudio" controls></audio>
-              <a class="stem-download-btn" id="sep-instrumentalDownload" href="#" download="instrumental.mp3">
-                Download Instrumental
-              </a>
+
+            <div class="trim-times">
+              <span>Start: <span class="time-green" id="ed-trimStart">0:00.0</span></span>
+              <span>Selection: <span id="ed-trimDuration">0:00.0</span></span>
+              <span>End: <span class="time-red" id="ed-trimEnd">0:00.0</span></span>
+            </div>
+
+            <!-- Toolbar -->
+            <div class="editor-toolbar">
+              <button id="ed-playToggle">Play (Space)</button>
+              <button id="ed-resetBtn">Reset trim</button>
+              <button id="ed-fadeToggle">Fade In/Out</button>
+            </div>
+
+            <!-- Fade controls -->
+            <div class="effect-controls" id="ed-fadeControls">
+              <div class="effect-row">
+                <label>Fade in:</label>
+                <input type="range" id="ed-fadeIn" min="0" max="10" step="0.1" value="0">
+                <span class="range-val" id="ed-fadeInVal">0.0s</span>
+              </div>
+              <div class="effect-row">
+                <label>Fade out:</label>
+                <input type="range" id="ed-fadeOut" min="0" max="10" step="0.1" value="0">
+                <span class="range-val" id="ed-fadeOutVal">0.0s</span>
+              </div>
+            </div>
+
+            <!-- Export -->
+            <button class="action-btn" id="ed-exportBtn">Export Mixed MP3</button>
+
+            <div class="progress-wrap" id="ed-progressWrap">
+              <div class="progress-bar"><div class="fill" id="ed-progressFill"></div></div>
+              <p class="progress-text" id="ed-progressText">Starting...</p>
+            </div>
+
+            <div class="result" id="ed-result">
+              <a id="ed-downloadLink" href="#" download="edited.mp3">Download Edited MP3</a>
+              <p class="info" id="ed-resultInfo"></p>
+              <div class="preview">
+                <p class="preview-label">Preview:</p>
+                <audio id="ed-audioPreview" controls></audio>
+              </div>
+            </div>
+
+            <!-- ── Stem Separation ── -->
+            <div class="separator-section" id="ed-separatorSection">
+              <div class="section-divider"></div>
+              <h3 class="section-heading">Stem Separation</h3>
+              <p class="section-subtitle">Separate vocals from instrumental using AI (Demucs v4 via Hugging Face)</p>
+
+              <button class="action-btn separator-btn" id="sep-startBtn" disabled>
+                Load an MP3 above first
+              </button>
+
+              <div class="separator-status" id="sep-status" style="display:none;">
+                <div class="separator-status-icon" id="sep-statusIcon"></div>
+                <span id="sep-statusText">Connecting to AI service...</span>
+              </div>
+
+              <div class="progress-wrap" id="sep-progressWrap">
+                <div class="progress-bar"><div class="fill" id="sep-progressFill"></div></div>
+                <p class="progress-text" id="sep-progressText"></p>
+              </div>
+
+              <div class="error" id="sep-errorBox"></div>
+
+              <div class="separator-results" id="sep-results" style="display:none;">
+                <div class="stem-card">
+                  <h4>Vocals</h4>
+                  <audio id="sep-vocalsAudio" controls></audio>
+                  <a class="stem-download-btn" id="sep-vocalsDownload" href="#" download="vocals.mp3">
+                    Download Vocals
+                  </a>
+                </div>
+                <div class="stem-card">
+                  <h4>Instrumental</h4>
+                  <audio id="sep-instrumentalAudio" controls></audio>
+                  <a class="stem-download-btn" id="sep-instrumentalDownload" href="#" download="instrumental.mp3">
+                    Download Instrumental
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
+        </div>
+
+        <!-- ── Right: File Library Panel ── -->
+        <div class="editor-file-panel">
+          <div class="file-panel-header">
+            <h3>File Library</h3>
+            <div class="upload-area upload-area-compact" id="ed-uploadArea">
+              <input type="file" id="ed-fileInput" accept=".mp3,audio/mpeg" multiple>
+              <p class="upload-label">Click or drag MP3s here</p>
+              <p class="file-name" id="ed-fileName"></p>
+            </div>
+            <div class="upload-alt">
+              or <button class="gdrive-btn" id="ed-gdriveBtn" disabled>Import from Google Drive</button>
+            </div>
+            <div class="gdrive-notice" id="ed-gdriveNotice"></div>
+          </div>
+          <div class="file-panel-list" id="ed-libraryList"></div>
+          <div class="file-panel-footer" id="ed-libraryFooter"></div>
         </div>
       </div>
     </div>

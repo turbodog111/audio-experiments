@@ -1,56 +1,66 @@
 /* ═══════════════════════════════════════════════
    Tab 3: MP3 Editor — Multi-Track Mixer
+   ─────────────────────────────────────────────
+   File Library + Blank Track Slots + Drag & Drop
    ═══════════════════════════════════════════════ */
 (function editorTab() {
   /* ── DOM references ── */
-  const uploadArea      = document.getElementById('ed-uploadArea');
-  const fileInput       = document.getElementById('ed-fileInput');
-  const fileNameEl      = document.getElementById('ed-fileName');
-  const errorBox        = document.getElementById('ed-errorBox');
-  const gdriveBtn       = document.getElementById('ed-gdriveBtn');
-  const gdriveNotice    = document.getElementById('ed-gdriveNotice');
-  const workspace       = document.getElementById('ed-workspace');
-  const trackListEl     = document.getElementById('ed-trackList');
-  const trackCountEl    = document.getElementById('ed-trackCount');
-  const trackListItems  = document.getElementById('ed-trackListItems');
-  const waveformContainer = document.getElementById('ed-waveformContainer');
-  const waveformLanes   = document.getElementById('ed-waveformLanes');
-  const overlayLeft     = document.getElementById('ed-overlayLeft');
-  const overlayRight    = document.getElementById('ed-overlayRight');
-  const handleLeft      = document.getElementById('ed-handleLeft');
-  const handleRight     = document.getElementById('ed-handleRight');
-  const playheadEl      = document.getElementById('ed-playhead');
-  const trimStartEl     = document.getElementById('ed-trimStart');
-  const trimEndEl       = document.getElementById('ed-trimEnd');
-  const trimDurEl       = document.getElementById('ed-trimDuration');
-  const playToggle      = document.getElementById('ed-playToggle');
-  const resetBtn        = document.getElementById('ed-resetBtn');
-  const fadeToggle      = document.getElementById('ed-fadeToggle');
-  const fadeControls    = document.getElementById('ed-fadeControls');
-  const fadeInRange     = document.getElementById('ed-fadeIn');
-  const fadeOutRange    = document.getElementById('ed-fadeOut');
-  const fadeInVal       = document.getElementById('ed-fadeInVal');
-  const fadeOutVal      = document.getElementById('ed-fadeOutVal');
-  const exportBtn       = document.getElementById('ed-exportBtn');
-  const progressWrap    = document.getElementById('ed-progressWrap');
-  const progressFill    = document.getElementById('ed-progressFill');
-  const progressTextEl  = document.getElementById('ed-progressText');
-  const resultDiv       = document.getElementById('ed-result');
-  const dlLink          = document.getElementById('ed-downloadLink');
-  const resultInfo      = document.getElementById('ed-resultInfo');
-  const audioPreview    = document.getElementById('ed-audioPreview');
+  var uploadArea      = document.getElementById('ed-uploadArea');
+  var fileInput       = document.getElementById('ed-fileInput');
+  var fileNameEl      = document.getElementById('ed-fileName');
+  var errorBox        = document.getElementById('ed-errorBox');
+  var gdriveBtn       = document.getElementById('ed-gdriveBtn');
+  var gdriveNotice    = document.getElementById('ed-gdriveNotice');
+  var workspace       = document.getElementById('ed-workspace');
+  var addTrackBtn     = document.getElementById('ed-addTrackBtn');
+  var trackCountEl    = document.getElementById('ed-trackCount');
+  var tracksContainer = document.getElementById('ed-tracksContainer');
+  var libraryList     = document.getElementById('ed-libraryList');
+  var libraryFooter   = document.getElementById('ed-libraryFooter');
+  var waveformContainer = document.getElementById('ed-waveformContainer');
+  var waveformLanes   = document.getElementById('ed-waveformLanes');
+  var overlayLeft     = document.getElementById('ed-overlayLeft');
+  var overlayRight    = document.getElementById('ed-overlayRight');
+  var handleLeft      = document.getElementById('ed-handleLeft');
+  var handleRight     = document.getElementById('ed-handleRight');
+  var playheadEl      = document.getElementById('ed-playhead');
+  var trimStartEl     = document.getElementById('ed-trimStart');
+  var trimEndEl       = document.getElementById('ed-trimEnd');
+  var trimDurEl       = document.getElementById('ed-trimDuration');
+  var playToggle      = document.getElementById('ed-playToggle');
+  var resetBtn        = document.getElementById('ed-resetBtn');
+  var fadeToggle      = document.getElementById('ed-fadeToggle');
+  var fadeControls    = document.getElementById('ed-fadeControls');
+  var fadeInRange     = document.getElementById('ed-fadeIn');
+  var fadeOutRange    = document.getElementById('ed-fadeOut');
+  var fadeInVal       = document.getElementById('ed-fadeInVal');
+  var fadeOutVal      = document.getElementById('ed-fadeOutVal');
+  var exportBtn       = document.getElementById('ed-exportBtn');
+  var progressWrap    = document.getElementById('ed-progressWrap');
+  var progressFill    = document.getElementById('ed-progressFill');
+  var progressTextEl  = document.getElementById('ed-progressText');
+  var resultDiv       = document.getElementById('ed-result');
+  var dlLink          = document.getElementById('ed-downloadLink');
+  var resultInfo      = document.getElementById('ed-resultInfo');
+  var audioPreview    = document.getElementById('ed-audioPreview');
 
-  /* ── Track state ── */
+  /* ── Constants ── */
   var TRACK_COLORS = ['#e94560', '#4ecca3', '#4285f4', '#ffa726', '#ab47bc', '#26c6da'];
-  var tracks = [];
-  var nextTrackId = 0;
-  var totalDuration = 0;
+
+  /* ── File Library state ── */
+  var libraryFiles = [];
+  var nextFileId = 0;
+
+  /* ── Track Slots state ── */
+  var trackSlots = [];
+  var nextSlotId = 0;
 
   /* ── Trim state ── */
   var trimStartRatio = 0;
   var trimEndRatio = 1;
 
   /* ── Playhead state ── */
+  var totalDuration = 0;
   var playheadRatio = 0;
   var isPlaying = false;
   var playCtx = null;
@@ -58,12 +68,47 @@
   var playStartRatio = 0;
   var playAnimId = null;
 
+  /* ── Drag state ── */
+  var draggedFileId = null;
+
   function sp(pct, text) { setProgress(progressFill, progressTextEl, pct, text); }
 
   showGdriveSetupNotice(gdriveNotice);
 
   /* ═══════════════════════════════════════════════
-     File upload
+     Helpers
+     ═══════════════════════════════════════════════ */
+
+  function fmtTime(sec) {
+    var m = Math.floor(sec / 60);
+    var s = sec % 60;
+    return m + ':' + s.toFixed(1).padStart(4, '0');
+  }
+
+  function formatPan(pan) {
+    var pct = Math.round(pan * 100);
+    if (pct === 0) return 'C';
+    if (pct < 0) return Math.abs(pct) + 'L';
+    return pct + 'R';
+  }
+
+  function getLibFile(fileId) {
+    for (var i = 0; i < libraryFiles.length; i++) {
+      if (libraryFiles[i].id === fileId) return libraryFiles[i];
+    }
+    return null;
+  }
+
+  function getAssignedSlots() {
+    var out = [];
+    for (var i = 0; i < trackSlots.length; i++) {
+      if (trackSlots[i].assignedFileId !== null) out.push(trackSlots[i]);
+    }
+    return out;
+  }
+
+  /* ═══════════════════════════════════════════════
+     File Library — Upload & Management
      ═══════════════════════════════════════════════ */
 
   uploadArea.addEventListener('click', function() { fileInput.click(); });
@@ -72,10 +117,10 @@
   uploadArea.addEventListener('drop', function(e) {
     e.preventDefault();
     uploadArea.classList.remove('dragover');
-    if (e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files);
+    if (e.dataTransfer.files.length > 0) addFilesToLibrary(e.dataTransfer.files);
   });
   fileInput.addEventListener('change', function() {
-    if (fileInput.files.length > 0) addFiles(fileInput.files);
+    if (fileInput.files.length > 0) addFilesToLibrary(fileInput.files);
     fileInput.value = '';
   });
 
@@ -88,7 +133,7 @@
         var files = results.map(function(r) {
           return new File([r.blob], r.name, { type: 'audio/mpeg' });
         });
-        await addFiles(files);
+        await addFilesToLibrary(files);
       }
     } catch (err) {
       showError(errorBox, 'Google Drive import failed: ' + err.message);
@@ -98,252 +143,594 @@
     }
   });
 
-  async function addFiles(fileList) {
+  async function addFilesToLibrary(fileList) {
     hideError(errorBox);
     var actx = new (window.AudioContext || window.webkitAudioContext)();
+    var added = 0;
 
     for (var i = 0; i < fileList.length; i++) {
       var file = fileList[i];
       if (!file.name.toLowerCase().endsWith('.mp3') && file.type !== 'audio/mpeg') continue;
+
+      // Skip duplicates (same name + size)
+      var dup = false;
+      for (var j = 0; j < libraryFiles.length; j++) {
+        if (libraryFiles[j].name === file.name && libraryFiles[j].size === file.size) { dup = true; break; }
+      }
+      if (dup) continue;
+
       try {
         var arrayBuf = await file.arrayBuffer();
         var buffer = await actx.decodeAudioData(arrayBuf);
-        var track = {
-          id: nextTrackId++,
+        libraryFiles.push({
+          id: nextFileId++,
           file: file,
           buffer: buffer,
           name: file.name,
-          color: TRACK_COLORS[tracks.length % TRACK_COLORS.length],
-          volume: 1.0,
-          pan: 0,
-          canvas: null,
-          gainNode: null,
-          panNode: null,
-          sourceNode: null
-        };
-        tracks.push(track);
+          duration: buffer.duration,
+          size: file.size
+        });
+        added++;
       } catch (err) {
         showError(errorBox, 'Failed to decode ' + file.name + ': ' + err.message);
       }
     }
 
     actx.close();
-    recalcDuration();
 
-    if (tracks.length > 0) {
-      workspace.classList.add('active');
+    if (added > 0) {
       uploadArea.classList.add('has-file');
-      trackListEl.style.display = 'block';
-    }
+      fileNameEl.textContent = libraryFiles.length + ' file' + (libraryFiles.length !== 1 ? 's' : '') + ' in library';
 
-    fileNameEl.textContent = tracks.length + ' track' + (tracks.length !== 1 ? 's' : '') + ' loaded';
-    trackCountEl.textContent = tracks.length;
-
-    buildTrackListUI();
-    buildWaveformLanes();
-    drawAllWaveforms();
-    updateTrimUI();
-    updatePlayheadUI();
-    resultDiv.classList.remove('active');
-    dispatchSeparatorEvent();
-  }
-
-  function removeTrack(trackId) {
-    tracks = tracks.filter(function(t) { return t.id !== trackId; });
-    recalcDuration();
-
-    if (tracks.length === 0) {
-      workspace.classList.remove('active');
-      uploadArea.classList.remove('has-file');
-      trackListEl.style.display = 'none';
-      fileNameEl.textContent = '';
-      stopPlayback();
-    } else {
-      fileNameEl.textContent = tracks.length + ' track' + (tracks.length !== 1 ? 's' : '') + ' loaded';
-    }
-
-    trackCountEl.textContent = tracks.length;
-    buildTrackListUI();
-    buildWaveformLanes();
-    drawAllWaveforms();
-    updateTrimUI();
-    updatePlayheadUI();
-    dispatchSeparatorEvent();
-  }
-
-  function recalcDuration() {
-    totalDuration = 0;
-    for (var i = 0; i < tracks.length; i++) {
-      if (tracks[i].buffer.duration > totalDuration) {
-        totalDuration = tracks[i].buffer.duration;
+      // Auto-add one blank track if none exist yet
+      if (trackSlots.length === 0) {
+        addTrackSlot();
       }
+    }
+
+    rebuildLibraryUI();
+  }
+
+  function removeFromLibrary(fileId) {
+    libraryFiles = libraryFiles.filter(function(f) { return f.id !== fileId; });
+
+    // Unassign any track slots using this file
+    var changed = false;
+    for (var i = 0; i < trackSlots.length; i++) {
+      if (trackSlots[i].assignedFileId === fileId) {
+        trackSlots[i].assignedFileId = null;
+        changed = true;
+      }
+    }
+
+    if (libraryFiles.length === 0) {
+      uploadArea.classList.remove('has-file');
+      fileNameEl.textContent = '';
+    } else {
+      fileNameEl.textContent = libraryFiles.length + ' file' + (libraryFiles.length !== 1 ? 's' : '') + ' in library';
+    }
+
+    rebuildLibraryUI();
+    if (changed) {
+      rebuildTracksUI();
+      recalcDuration();
+      buildWaveformLanes();
+      drawAllWaveforms();
+      updateWorkspaceVisibility();
+      dispatchSeparatorEvent();
     }
   }
 
   /* ═══════════════════════════════════════════════
-     Track list UI
+     Library Panel UI
      ═══════════════════════════════════════════════ */
 
-  function buildTrackListUI() {
-    trackListItems.innerHTML = '';
+  function rebuildLibraryUI() {
+    libraryList.innerHTML = '';
 
-    for (var i = 0; i < tracks.length; i++) {
-      (function(track) {
-        var li = document.createElement('li');
-        li.className = 'track-row';
-        li.dataset.trackId = track.id;
-        li.style.setProperty('--track-color', track.color);
+    for (var i = 0; i < libraryFiles.length; i++) {
+      (function(lf) {
+        var item = document.createElement('div');
+        item.className = 'file-panel-item';
+        item.draggable = true;
+        item.dataset.fileId = lf.id;
 
-        // Header row
-        var header = document.createElement('div');
-        header.className = 'track-header';
+        var icon = document.createElement('span');
+        icon.className = 'file-panel-icon';
+        icon.textContent = '\u266A';
+        item.appendChild(icon);
+
+        var info = document.createElement('div');
+        info.className = 'file-panel-info';
+
+        var nameEl = document.createElement('div');
+        nameEl.className = 'file-panel-name';
+        nameEl.textContent = lf.name.replace(/\.mp3$/i, '');
+        nameEl.title = lf.name;
+        info.appendChild(nameEl);
+
+        var meta = document.createElement('div');
+        meta.className = 'file-panel-meta';
+        meta.textContent = fmtTime(lf.duration) + ' \u2022 ' + formatSize(lf.size);
+        info.appendChild(meta);
+
+        item.appendChild(info);
+
+        var removeBtn = document.createElement('button');
+        removeBtn.className = 'file-panel-remove';
+        removeBtn.textContent = '\u00d7';
+        removeBtn.title = 'Remove from library';
+        removeBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          removeFromLibrary(lf.id);
+        });
+        item.appendChild(removeBtn);
+
+        // Drag handlers
+        item.addEventListener('dragstart', function(e) {
+          draggedFileId = lf.id;
+          e.dataTransfer.effectAllowed = 'copy';
+          e.dataTransfer.setData('text/plain', String(lf.id));
+          item.classList.add('dragging');
+          document.body.classList.add('drag-in-progress');
+        });
+        item.addEventListener('dragend', function() {
+          item.classList.remove('dragging');
+          document.body.classList.remove('drag-in-progress');
+          draggedFileId = null;
+        });
+
+        libraryList.appendChild(item);
+      })(libraryFiles[i]);
+    }
+
+    libraryFooter.textContent = libraryFiles.length === 0
+      ? 'No files loaded'
+      : libraryFiles.length + ' file' + (libraryFiles.length !== 1 ? 's' : '');
+  }
+
+  /* ═══════════════════════════════════════════════
+     Track Slot Management
+     ═══════════════════════════════════════════════ */
+
+  function addTrackSlot() {
+    trackSlots.push({
+      id: nextSlotId++,
+      assignedFileId: null,
+      volume: 1.0,
+      pan: 0,
+      canvas: null,
+      gainNode: null,
+      panNode: null,
+      sourceNode: null
+    });
+    rebuildTracksUI();
+    updateTrackCount();
+  }
+
+  function removeTrackSlot(slotId) {
+    trackSlots = trackSlots.filter(function(s) { return s.id !== slotId; });
+    rebuildTracksUI();
+    recalcDuration();
+    buildWaveformLanes();
+    drawAllWaveforms();
+    updateWorkspaceVisibility();
+    updateTrackCount();
+    dispatchSeparatorEvent();
+    if (getAssignedSlots().length === 0) stopPlayback();
+  }
+
+  function moveSlotUp(slotId) {
+    var idx = -1;
+    for (var i = 0; i < trackSlots.length; i++) {
+      if (trackSlots[i].id === slotId) { idx = i; break; }
+    }
+    if (idx <= 0) return;
+    var tmp = trackSlots[idx - 1];
+    trackSlots[idx - 1] = trackSlots[idx];
+    trackSlots[idx] = tmp;
+    rebuildTracksUI();
+    buildWaveformLanes();
+    drawAllWaveforms();
+  }
+
+  function moveSlotDown(slotId) {
+    var idx = -1;
+    for (var i = 0; i < trackSlots.length; i++) {
+      if (trackSlots[i].id === slotId) { idx = i; break; }
+    }
+    if (idx < 0 || idx >= trackSlots.length - 1) return;
+    var tmp = trackSlots[idx + 1];
+    trackSlots[idx + 1] = trackSlots[idx];
+    trackSlots[idx] = tmp;
+    rebuildTracksUI();
+    buildWaveformLanes();
+    drawAllWaveforms();
+  }
+
+  function assignFileToSlot(fileId, slotId) {
+    var slot = null;
+    for (var i = 0; i < trackSlots.length; i++) {
+      if (trackSlots[i].id === slotId) { slot = trackSlots[i]; break; }
+    }
+    if (!slot || !getLibFile(fileId)) return;
+
+    slot.assignedFileId = fileId;
+    rebuildTracksUI();
+    recalcDuration();
+    buildWaveformLanes();
+    drawAllWaveforms();
+    updateWorkspaceVisibility();
+    updateTrimUI();
+    updatePlayheadUI();
+    dispatchSeparatorEvent();
+  }
+
+  function unassignSlot(slotId) {
+    var slot = null;
+    for (var i = 0; i < trackSlots.length; i++) {
+      if (trackSlots[i].id === slotId) { slot = trackSlots[i]; break; }
+    }
+    if (!slot) return;
+    slot.assignedFileId = null;
+    rebuildTracksUI();
+    recalcDuration();
+    buildWaveformLanes();
+    drawAllWaveforms();
+    updateWorkspaceVisibility();
+    dispatchSeparatorEvent();
+    if (getAssignedSlots().length === 0) stopPlayback();
+  }
+
+  function updateTrackCount() {
+    trackCountEl.textContent = trackSlots.length + ' track' + (trackSlots.length !== 1 ? 's' : '');
+  }
+
+  function updateWorkspaceVisibility() {
+    if (getAssignedSlots().length > 0) {
+      workspace.classList.add('active');
+    } else {
+      workspace.classList.remove('active');
+    }
+  }
+
+  addTrackBtn.addEventListener('click', function() { addTrackSlot(); });
+
+  /* ═══════════════════════════════════════════════
+     Track Rows UI
+     ═══════════════════════════════════════════════ */
+
+  function rebuildTracksUI() {
+    tracksContainer.innerHTML = '';
+
+    for (var idx = 0; idx < trackSlots.length; idx++) {
+      (function(slot, index) {
+        var lf = slot.assignedFileId !== null ? getLibFile(slot.assignedFileId) : null;
+        var color = lf ? TRACK_COLORS[index % TRACK_COLORS.length] : '';
+
+        var row = document.createElement('div');
+        row.className = 'editor-track-row';
+        row.dataset.slotId = slot.id;
+        if (color) row.style.setProperty('--track-color', color);
+
+        // ── Left Controls ──
+        var left = document.createElement('div');
+        left.className = 'track-left-controls';
 
         var dot = document.createElement('span');
         dot.className = 'track-color-dot';
-        header.appendChild(dot);
+        left.appendChild(dot);
 
-        var name = document.createElement('span');
-        name.className = 'track-name';
-        name.textContent = track.name.replace(/\.mp3$/i, '');
-        name.title = track.name;
-        header.appendChild(name);
+        var num = document.createElement('span');
+        num.className = 'track-number';
+        num.textContent = (index + 1);
+        left.appendChild(num);
+
+        var reorderBtns = document.createElement('div');
+        reorderBtns.className = 'track-reorder-btns';
+
+        var upBtn = document.createElement('button');
+        upBtn.textContent = '\u25B2';
+        upBtn.title = 'Move up';
+        if (index === 0) upBtn.disabled = true;
+        upBtn.addEventListener('click', function() { moveSlotUp(slot.id); });
+        reorderBtns.appendChild(upBtn);
+
+        var downBtn = document.createElement('button');
+        downBtn.textContent = '\u25BC';
+        downBtn.title = 'Move down';
+        if (index === trackSlots.length - 1) downBtn.disabled = true;
+        downBtn.addEventListener('click', function() { moveSlotDown(slot.id); });
+        reorderBtns.appendChild(downBtn);
+
+        left.appendChild(reorderBtns);
 
         var removeBtn = document.createElement('button');
         removeBtn.className = 'track-remove-btn';
         removeBtn.textContent = '\u00d7';
         removeBtn.title = 'Remove track';
-        removeBtn.addEventListener('click', function() { removeTrack(track.id); });
-        header.appendChild(removeBtn);
+        removeBtn.addEventListener('click', function() { removeTrackSlot(slot.id); });
+        left.appendChild(removeBtn);
 
-        li.appendChild(header);
+        row.appendChild(left);
 
-        // Controls row
-        var controls = document.createElement('div');
-        controls.className = 'track-controls';
+        // ── Center Content ──
+        var center = document.createElement('div');
+        center.className = 'track-center';
 
-        // Volume
+        if (!lf) {
+          // Blank — drop zone
+          var dropZone = document.createElement('div');
+          dropZone.className = 'track-drop-zone';
+          dropZone.dataset.slotId = slot.id;
+
+          var dzText = document.createElement('span');
+          dzText.className = 'drop-zone-text';
+          dzText.textContent = 'Drag file here';
+          dropZone.appendChild(dzText);
+
+          // Drop handlers
+          dropZone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            dropZone.classList.add('drag-over');
+          });
+          dropZone.addEventListener('dragleave', function() {
+            dropZone.classList.remove('drag-over');
+          });
+          dropZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            if (draggedFileId !== null) {
+              assignFileToSlot(draggedFileId, slot.id);
+            }
+          });
+
+          center.appendChild(dropZone);
+        } else {
+          // Assigned — show file info + mini waveform
+          var assigned = document.createElement('div');
+          assigned.className = 'track-assigned';
+
+          var infoBar = document.createElement('div');
+          infoBar.className = 'track-info-bar';
+
+          var nameEl = document.createElement('span');
+          nameEl.className = 'track-name';
+          nameEl.textContent = lf.name.replace(/\.mp3$/i, '');
+          nameEl.title = lf.name;
+          infoBar.appendChild(nameEl);
+
+          var unassignBtn = document.createElement('button');
+          unassignBtn.className = 'track-unassign-btn';
+          unassignBtn.textContent = '\u232B';
+          unassignBtn.title = 'Unassign file';
+          unassignBtn.addEventListener('click', function() { unassignSlot(slot.id); });
+          infoBar.appendChild(unassignBtn);
+
+          assigned.appendChild(infoBar);
+
+          var canvas = document.createElement('canvas');
+          canvas.className = 'track-mini-canvas';
+          assigned.appendChild(canvas);
+          slot.canvas = canvas;
+
+          // Draw mini waveform after append
+          setTimeout(function() { drawMiniWaveform(lf.buffer, canvas, color); }, 0);
+
+          // Also allow re-drop to replace
+          assigned.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            assigned.style.outline = '2px solid var(--accent-green)';
+          });
+          assigned.addEventListener('dragleave', function() {
+            assigned.style.outline = '';
+          });
+          assigned.addEventListener('drop', function(e) {
+            e.preventDefault();
+            assigned.style.outline = '';
+            if (draggedFileId !== null) {
+              assignFileToSlot(draggedFileId, slot.id);
+            }
+          });
+
+          center.appendChild(assigned);
+        }
+
+        row.appendChild(center);
+
+        // ── Right Controls (vol + pan) ──
+        var right = document.createElement('div');
+        right.className = 'track-right-controls';
+
+        // Volume row
+        var volRow = document.createElement('div');
+        volRow.className = 'track-ctrl-row';
+
         var volLabel = document.createElement('label');
         volLabel.textContent = 'Vol';
-        controls.appendChild(volLabel);
+        volRow.appendChild(volLabel);
 
         var volSlider = document.createElement('input');
         volSlider.type = 'range';
         volSlider.className = 'track-vol';
         volSlider.min = '0';
         volSlider.max = '150';
-        volSlider.value = String(Math.round(track.volume * 100));
-        volSlider.step = '1';
-        controls.appendChild(volSlider);
+        volSlider.step = '5';
+        volSlider.value = String(Math.round(slot.volume * 100));
+        volRow.appendChild(volSlider);
 
-        var volVal = document.createElement('span');
-        volVal.className = 'track-vol-val';
-        volVal.textContent = Math.round(track.volume * 100) + '%';
-        controls.appendChild(volVal);
+        var volValEl = document.createElement('span');
+        volValEl.className = 'track-vol-val';
+        volValEl.textContent = Math.round(slot.volume * 100) + '%';
+        volRow.appendChild(volValEl);
 
         volSlider.addEventListener('input', function() {
-          track.volume = parseInt(volSlider.value) / 100;
-          volVal.textContent = volSlider.value + '%';
-          if (track.gainNode) {
-            track.gainNode.gain.value = track.volume;
-          }
+          slot.volume = parseInt(volSlider.value) / 100;
+          volValEl.textContent = volSlider.value + '%';
+          if (slot.gainNode) slot.gainNode.gain.value = slot.volume;
         });
 
-        // Pan
+        right.appendChild(volRow);
+
+        // Pan row
+        var panRow = document.createElement('div');
+        panRow.className = 'track-ctrl-row';
+
         var panLabel = document.createElement('label');
         panLabel.textContent = 'Pan';
-        controls.appendChild(panLabel);
+        panRow.appendChild(panLabel);
 
         var panSlider = document.createElement('input');
         panSlider.type = 'range';
         panSlider.className = 'track-pan';
         panSlider.min = '-100';
         panSlider.max = '100';
-        panSlider.value = String(Math.round(track.pan * 100));
-        panSlider.step = '1';
-        controls.appendChild(panSlider);
+        panSlider.step = '5';
+        panSlider.value = String(Math.round(slot.pan * 100));
+        panRow.appendChild(panSlider);
 
-        var panVal = document.createElement('span');
-        panVal.className = 'track-pan-val';
-        panVal.textContent = formatPan(track.pan);
-        controls.appendChild(panVal);
+        var panValEl = document.createElement('span');
+        panValEl.className = 'track-pan-val';
+        panValEl.textContent = formatPan(slot.pan);
+        panRow.appendChild(panValEl);
 
         panSlider.addEventListener('input', function() {
-          track.pan = parseInt(panSlider.value) / 100;
-          panVal.textContent = formatPan(track.pan);
-          if (track.panNode) {
-            track.panNode.pan.value = track.pan;
-          }
+          slot.pan = parseInt(panSlider.value) / 100;
+          panValEl.textContent = formatPan(slot.pan);
+          if (slot.panNode) slot.panNode.pan.value = slot.pan;
         });
 
-        li.appendChild(controls);
-        trackListItems.appendChild(li);
-      })(tracks[i]);
-    }
-  }
+        right.appendChild(panRow);
+        row.appendChild(right);
 
-  function formatPan(pan) {
-    var pct = Math.round(pan * 100);
-    if (pct === 0) return 'C';
-    if (pct < 0) return Math.abs(pct) + 'L';
-    return pct + 'R';
+        tracksContainer.appendChild(row);
+      })(trackSlots[idx], idx);
+    }
+
+    updateTrackCount();
   }
 
   /* ═══════════════════════════════════════════════
-     Waveform lanes
+     Mini waveform (per-track row canvas)
      ═══════════════════════════════════════════════ */
+
+  function drawMiniWaveform(buffer, canvas, color) {
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var dpr = window.devicePixelRatio || 1;
+    var rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    var w = rect.width;
+    var h = rect.height;
+    var mid = h / 2;
+    var data = buffer.getChannelData(0);
+    var step = Math.max(1, Math.floor(data.length / w));
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Center line
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, mid);
+    ctx.lineTo(w, mid);
+    ctx.stroke();
+
+    // Bars
+    for (var x = 0; x < w; x++) {
+      var start = Math.floor(x * data.length / w);
+      var min = 0, max = 0;
+      for (var j = 0; j < step; j++) {
+        var val = data[start + j] || 0;
+        if (val < min) min = val;
+        if (val > max) max = val;
+      }
+      var top = mid + min * mid;
+      var bottom = mid + max * mid;
+      ctx.fillStyle = color || '#e94560';
+      ctx.fillRect(x, top, 1, bottom - top || 1);
+    }
+  }
+
+  /* ═══════════════════════════════════════════════
+     Duration & Global Waveform
+     ═══════════════════════════════════════════════ */
+
+  function recalcDuration() {
+    totalDuration = 0;
+    var assigned = getAssignedSlots();
+    for (var i = 0; i < assigned.length; i++) {
+      var lf = getLibFile(assigned[i].assignedFileId);
+      if (lf && lf.buffer.duration > totalDuration) {
+        totalDuration = lf.buffer.duration;
+      }
+    }
+  }
 
   function buildWaveformLanes() {
     waveformLanes.innerHTML = '';
-    for (var i = 0; i < tracks.length; i++) {
+    var assigned = getAssignedSlots();
+    for (var i = 0; i < assigned.length; i++) {
+      var lf = getLibFile(assigned[i].assignedFileId);
+      if (!lf) continue;
+
       var lane = document.createElement('div');
       lane.className = 'waveform-lane';
-      lane.dataset.trackId = tracks[i].id;
 
       var canvas = document.createElement('canvas');
       canvas.className = 'lane-canvas';
       lane.appendChild(canvas);
 
       waveformLanes.appendChild(lane);
-      tracks[i].canvas = canvas;
+      assigned[i]._globalCanvas = canvas;
     }
   }
 
   function drawAllWaveforms() {
-    for (var i = 0; i < tracks.length; i++) {
-      drawTrackWaveform(tracks[i]);
+    var assigned = getAssignedSlots();
+    for (var i = 0; i < assigned.length; i++) {
+      var canvas = assigned[i]._globalCanvas;
+      var lf = getLibFile(assigned[i].assignedFileId);
+      if (!canvas || !lf) continue;
+      drawGlobalWaveform(lf.buffer, canvas, TRACK_COLORS[i % TRACK_COLORS.length]);
     }
   }
 
-  function drawTrackWaveform(track) {
-    var canvas = track.canvas;
+  function drawGlobalWaveform(buffer, canvas, color) {
     if (!canvas) return;
-    var tCtx = canvas.getContext('2d');
+    var ctx = canvas.getContext('2d');
     var dpr = window.devicePixelRatio || 1;
     var rect = canvas.getBoundingClientRect();
+    if (rect.width === 0) return;
+
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
-    tCtx.scale(dpr, dpr);
+    ctx.scale(dpr, dpr);
 
     var w = rect.width;
     var h = rect.height;
     var mid = h / 2;
-    var data = track.buffer.getChannelData(0);
+    var data = buffer.getChannelData(0);
 
-    // This track occupies (track.buffer.duration / totalDuration) of the canvas width
-    var trackWidthPx = totalDuration > 0 ? (track.buffer.duration / totalDuration) * w : w;
+    var trackWidthPx = totalDuration > 0 ? (buffer.duration / totalDuration) * w : w;
     var step = Math.max(1, Math.floor(data.length / trackWidthPx));
 
-    tCtx.clearRect(0, 0, w, h);
+    ctx.clearRect(0, 0, w, h);
 
-    // Center line
-    tCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-    tCtx.lineWidth = 1;
-    tCtx.beginPath();
-    tCtx.moveTo(0, mid);
-    tCtx.lineTo(w, mid);
-    tCtx.stroke();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, mid);
+    ctx.lineTo(w, mid);
+    ctx.stroke();
 
-    // Waveform bars
     for (var x = 0; x < trackWidthPx; x++) {
       var start = Math.floor(x * data.length / trackWidthPx);
       var min = 0, max = 0;
@@ -354,30 +741,23 @@
       }
       var top = mid + min * mid;
       var bottom = mid + max * mid;
-      tCtx.fillStyle = track.color;
-      tCtx.fillRect(x, top, 1, bottom - top || 1);
+      ctx.fillStyle = color;
+      ctx.fillRect(x, top, 1, bottom - top || 1);
     }
 
     // Time markers
-    tCtx.fillStyle = '#4a4a5e';
-    tCtx.font = '10px Inter, sans-serif';
+    ctx.fillStyle = '#4a4a5e';
+    ctx.font = '10px Inter, sans-serif';
     var numMarkers = Math.min(10, Math.floor(totalDuration));
     if (numMarkers > 0) {
       var interval = totalDuration / numMarkers;
-      for (var i = 0; i <= numMarkers; i++) {
-        var t = i * interval;
+      for (var m = 0; m <= numMarkers; m++) {
+        var t = m * interval;
         var xm = (t / totalDuration) * w;
-        tCtx.fillRect(xm, h - 12, 1, 4);
-        tCtx.fillText(fmtTime(t), xm + 2, h - 2);
+        ctx.fillRect(xm, h - 12, 1, 4);
+        ctx.fillText(fmtTime(t), xm + 2, h - 2);
       }
     }
-  }
-
-  /* ── Time formatting ── */
-  function fmtTime(sec) {
-    var m = Math.floor(sec / 60);
-    var s = sec % 60;
-    return m + ':' + s.toFixed(1).padStart(4, '0');
   }
 
   /* ═══════════════════════════════════════════════
@@ -454,15 +834,13 @@
     }
   }
 
-  // Click on waveform container = seek
   waveformContainer.addEventListener('click', function(e) {
-    if (tracks.length === 0) return;
+    if (getAssignedSlots().length === 0) return;
     var rect = waveformContainer.getBoundingClientRect();
     var ratio = (e.clientX - rect.left) / rect.width;
     seekTo(ratio);
   });
 
-  // Draggable playhead
   function onPlayheadDown(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -481,7 +859,6 @@
       document.removeEventListener('mouseup', onUp);
       document.removeEventListener('touchmove', onMove);
       document.removeEventListener('touchend', onUp);
-      // If playing, restart from new position
       if (isPlaying) {
         stopPlayback();
         startPlayback();
@@ -518,13 +895,13 @@
      ═══════════════════════════════════════════════ */
 
   function stopPlayback() {
-    for (var i = 0; i < tracks.length; i++) {
-      if (tracks[i].sourceNode) {
-        try { tracks[i].sourceNode.stop(); } catch (_) {}
-        tracks[i].sourceNode = null;
+    for (var i = 0; i < trackSlots.length; i++) {
+      if (trackSlots[i].sourceNode) {
+        try { trackSlots[i].sourceNode.stop(); } catch (_) {}
+        trackSlots[i].sourceNode = null;
       }
-      tracks[i].gainNode = null;
-      tracks[i].panNode = null;
+      trackSlots[i].gainNode = null;
+      trackSlots[i].panNode = null;
     }
     if (playCtx) {
       playCtx.close();
@@ -539,7 +916,8 @@
   }
 
   function startPlayback() {
-    if (tracks.length === 0) return;
+    var assigned = getAssignedSlots();
+    if (assigned.length === 0) return;
     stopPlayback();
 
     playCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -549,28 +927,30 @@
     var playDuration = endTimeSec - startTimeSec;
     if (playDuration <= 0) return;
 
-    for (var i = 0; i < tracks.length; i++) {
-      var track = tracks[i];
+    for (var i = 0; i < assigned.length; i++) {
+      var slot = assigned[i];
+      var lf = getLibFile(slot.assignedFileId);
+      if (!lf) continue;
 
       var source = playCtx.createBufferSource();
-      source.buffer = track.buffer;
+      source.buffer = lf.buffer;
 
       var gain = playCtx.createGain();
-      gain.gain.value = track.volume;
+      gain.gain.value = slot.volume;
 
       var panner = playCtx.createStereoPanner();
-      panner.pan.value = track.pan;
+      panner.pan.value = slot.pan;
 
       source.connect(gain);
       gain.connect(panner);
       panner.connect(playCtx.destination);
 
-      track.sourceNode = source;
-      track.gainNode = gain;
-      track.panNode = panner;
+      slot.sourceNode = source;
+      slot.gainNode = gain;
+      slot.panNode = panner;
 
-      if (startTimeSec < track.buffer.duration) {
-        var trackPlayDuration = Math.min(playDuration, track.buffer.duration - startTimeSec);
+      if (startTimeSec < lf.buffer.duration) {
+        var trackPlayDuration = Math.min(playDuration, lf.buffer.duration - startTimeSec);
         source.start(0, startTimeSec, trackPlayDuration);
       }
     }
@@ -600,33 +980,33 @@
   }
 
   function togglePlayback() {
-    if (isPlaying) {
-      stopPlayback();
-    } else {
-      startPlayback();
-    }
+    if (isPlaying) stopPlayback();
+    else startPlayback();
   }
 
   playToggle.addEventListener('click', togglePlayback);
 
-  // Spacebar to toggle play/stop
   document.addEventListener('keydown', function(e) {
     if (e.code === 'Space' && !e.repeat) {
       var tag = document.activeElement.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON') return;
       if (!document.getElementById('tab-editor').classList.contains('active')) return;
-      if (tracks.length === 0) return;
+      if (getAssignedSlots().length === 0) return;
       e.preventDefault();
       togglePlayback();
     }
   });
 
   /* ═══════════════════════════════════════════════
-     Export — mix all tracks to stereo MP3
+     Export — mix assigned tracks to stereo MP3
      ═══════════════════════════════════════════════ */
 
   exportBtn.addEventListener('click', async function() {
-    if (tracks.length === 0) return;
+    var assigned = getAssignedSlots();
+    if (assigned.length === 0) {
+      showError(errorBox, 'No tracks assigned. Drag files onto tracks first.');
+      return;
+    }
 
     hideError(errorBox);
     exportBtn.disabled = true;
@@ -636,8 +1016,9 @@
     sp(5, 'Preparing mix...');
 
     try {
-      var sampleRate = tracks[0].buffer.sampleRate;
-      var numChannels = 2; // Always stereo for pan support
+      var firstLf = getLibFile(assigned[0].assignedFileId);
+      var sampleRate = firstLf.buffer.sampleRate;
+      var numChannels = 2;
       var totalSamples = Math.floor(totalDuration * sampleRate);
 
       var trimStartSample = Math.floor(trimStartRatio * totalSamples);
@@ -651,22 +1032,23 @@
         return;
       }
 
-      sp(10, 'Mixing ' + tracks.length + ' track' + (tracks.length !== 1 ? 's' : '') + '...');
+      sp(10, 'Mixing ' + assigned.length + ' track' + (assigned.length !== 1 ? 's' : '') + '...');
 
       var outLeft = new Float32Array(outputLength);
       var outRight = new Float32Array(outputLength);
 
-      for (var t = 0; t < tracks.length; t++) {
-        var track = tracks[t];
-        var vol = track.volume;
-        var pan = track.pan;
+      for (var t = 0; t < assigned.length; t++) {
+        var slot = assigned[t];
+        var lf = getLibFile(slot.assignedFileId);
+        if (!lf) continue;
 
-        // Equal-power pan law to match Web Audio StereoPannerNode
+        var vol = slot.volume;
+        var pan = slot.pan;
         var theta = (pan + 1) * Math.PI / 4;
         var leftGain = vol * Math.cos(theta);
         var rightGain = vol * Math.sin(theta);
 
-        var buf = track.buffer;
+        var buf = lf.buffer;
         var srcLeft = buf.getChannelData(0);
         var srcRight = buf.numberOfChannels >= 2 ? buf.getChannelData(1) : srcLeft;
         var trackSamples = buf.length;
@@ -679,11 +1061,11 @@
           }
         }
 
-        sp(10 + Math.floor(((t + 1) / tracks.length) * 20),
-          'Mixed track ' + (t + 1) + '/' + tracks.length);
+        sp(10 + Math.floor(((t + 1) / assigned.length) * 20),
+          'Mixed track ' + (t + 1) + '/' + assigned.length);
       }
 
-      // Apply fade in/out
+      // Fades
       sp(30, 'Applying fades...');
       var fadeInSec = parseFloat(fadeInRange.value) || 0;
       var fadeOutSec = parseFloat(fadeOutRange.value) || 0;
@@ -702,7 +1084,7 @@
         }
       }
 
-      // Clamp to prevent clipping
+      // Clamp
       for (var i = 0; i < outputLength; i++) {
         if (outLeft[i] > 1) outLeft[i] = 1;
         else if (outLeft[i] < -1) outLeft[i] = -1;
@@ -721,9 +1103,9 @@
 
       var blob = new Blob(mp3Data, { type: 'audio/mpeg' });
       var url = URL.createObjectURL(blob);
-      var outName = tracks.length === 1
-        ? tracks[0].name.replace(/\.mp3$/i, '') + '_edited.mp3'
-        : 'mix_' + tracks.length + '_tracks.mp3';
+      var outName = assigned.length === 1
+        ? getLibFile(assigned[0].assignedFileId).name.replace(/\.mp3$/i, '') + '_edited.mp3'
+        : 'mix_' + assigned.length + '_tracks.mp3';
 
       dlLink.href = url;
       dlLink.download = outName;
@@ -734,7 +1116,7 @@
       var secs = Math.floor(durationSec % 60);
       resultInfo.textContent = outName + ' \u2014 ' + formatSize(blob.size) +
         ' \u2014 ' + mins + 'm ' + secs + 's' +
-        ' \u2014 ' + tracks.length + ' track' + (tracks.length !== 1 ? 's' : '');
+        ' \u2014 ' + assigned.length + ' track' + (assigned.length !== 1 ? 's' : '');
 
       sp(100, 'Done!');
       resultDiv.classList.add('active');
@@ -753,15 +1135,19 @@
      ═══════════════════════════════════════════════ */
 
   function dispatchSeparatorEvent() {
-    if (tracks.length === 1) {
-      window.dispatchEvent(new CustomEvent('editor-file-loaded', {
-        detail: { file: tracks[0].file, audioBuffer: tracks[0].buffer, fileName: tracks[0].name }
-      }));
-    } else {
-      window.dispatchEvent(new CustomEvent('editor-file-loaded', {
-        detail: { file: null, audioBuffer: null, fileName: '', multiTrack: true }
-      }));
+    var assigned = getAssignedSlots();
+    if (assigned.length === 1) {
+      var lf = getLibFile(assigned[0].assignedFileId);
+      if (lf) {
+        window.dispatchEvent(new CustomEvent('editor-file-loaded', {
+          detail: { file: lf.file, audioBuffer: lf.buffer, fileName: lf.name }
+        }));
+        return;
+      }
     }
+    window.dispatchEvent(new CustomEvent('editor-file-loaded', {
+      detail: { file: null, audioBuffer: null, fileName: '', multiTrack: true }
+    }));
   }
 
   /* ═══════════════════════════════════════════════
@@ -772,11 +1158,17 @@
   window.addEventListener('resize', function() {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function() {
-      if (tracks.length > 0) {
+      if (getAssignedSlots().length > 0) {
         drawAllWaveforms();
         updateTrimUI();
         updatePlayheadUI();
       }
+      // Redraw mini canvases
+      rebuildTracksUI();
     }, 150);
   });
+
+  /* ── Initial state ── */
+  updateTrackCount();
+  rebuildLibraryUI();
 })();
