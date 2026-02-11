@@ -39,6 +39,9 @@
   var fadeInVal       = document.getElementById('ed-fadeInVal');
   var fadeOutVal      = document.getElementById('ed-fadeOutVal');
   var exportBtn       = document.getElementById('ed-exportBtn');
+  var saveProjectBtn  = document.getElementById('ed-saveProject');
+  var loadProjectBtn  = document.getElementById('ed-loadProject');
+  var loadProjectInput = document.getElementById('ed-loadProjectInput');
   var progressWrap    = document.getElementById('ed-progressWrap');
   var progressFill    = document.getElementById('ed-progressFill');
   var progressTextEl  = document.getElementById('ed-progressText');
@@ -2400,6 +2403,322 @@
       e.preventDefault();
       togglePlayback();
     }
+  });
+
+  /* ═══════════════════════════════════════════════
+     Save & Load Project
+     ═══════════════════════════════════════════════ */
+
+  function arrayBufferToBase64(buffer) {
+    var bytes = new Uint8Array(buffer);
+    var chunks = [];
+    var chunkSize = 8192;
+    for (var i = 0; i < bytes.length; i += chunkSize) {
+      chunks.push(String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize)));
+    }
+    return btoa(chunks.join(''));
+  }
+
+  function base64ToArrayBuffer(b64) {
+    var binary = atob(b64);
+    var bytes = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes.buffer;
+  }
+
+  function audioBufferToWavArrayBuffer(buffer) {
+    var numCh = buffer.numberOfChannels;
+    var sr = buffer.sampleRate;
+    var bitsPerSample = 16;
+    var bytesPerSample = bitsPerSample / 8;
+    var blockAlign = numCh * bytesPerSample;
+    var dataSize = buffer.length * blockAlign;
+    var headerSize = 44;
+    var abuf = new ArrayBuffer(headerSize + dataSize);
+    var view = new DataView(abuf);
+
+    // RIFF header
+    view.setUint8(0, 0x52); view.setUint8(1, 0x49); view.setUint8(2, 0x46); view.setUint8(3, 0x46);
+    view.setUint32(4, 36 + dataSize, true);
+    view.setUint8(8, 0x57); view.setUint8(9, 0x41); view.setUint8(10, 0x56); view.setUint8(11, 0x45);
+
+    // fmt chunk
+    view.setUint8(12, 0x66); view.setUint8(13, 0x6D); view.setUint8(14, 0x74); view.setUint8(15, 0x20);
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, numCh, true);
+    view.setUint32(24, sr, true);
+    view.setUint32(28, sr * blockAlign, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitsPerSample, true);
+
+    // data chunk
+    view.setUint8(36, 0x64); view.setUint8(37, 0x61); view.setUint8(38, 0x74); view.setUint8(39, 0x61);
+    view.setUint32(40, dataSize, true);
+
+    // Interleave channel data
+    var channels = [];
+    for (var ch = 0; ch < numCh; ch++) channels.push(buffer.getChannelData(ch));
+    var offset = 44;
+    for (var s = 0; s < buffer.length; s++) {
+      for (var ch = 0; ch < numCh; ch++) {
+        var sample = Math.max(-1, Math.min(1, channels[ch][s]));
+        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        offset += 2;
+      }
+    }
+
+    return abuf;
+  }
+
+  async function serializeProject() {
+    var libData = [];
+    for (var i = 0; i < libraryFiles.length; i++) {
+      var lf = libraryFiles[i];
+      var audioB64;
+      if (lf.file) {
+        // Original file object available — store as original format (MP3)
+        var ab = await lf.file.arrayBuffer();
+        audioB64 = arrayBufferToBase64(ab);
+      } else {
+        // Synthetic audio — encode AudioBuffer as WAV
+        var wavBuf = audioBufferToWavArrayBuffer(lf.buffer);
+        audioB64 = arrayBufferToBase64(wavBuf);
+      }
+      libData.push({
+        id: lf.id,
+        name: lf.name,
+        duration: lf.duration,
+        size: lf.size,
+        analysis: lf.analysis,
+        audioBase64: audioB64
+      });
+    }
+
+    var tracksData = [];
+    for (var i = 0; i < trackSlots.length; i++) {
+      var s = trackSlots[i];
+      tracksData.push({
+        id: s.id,
+        assignedFileId: s.assignedFileId,
+        volume: s.volume,
+        pan: s.pan,
+        startOffset: s.startOffset,
+        clipStart: s.clipStart,
+        clipEnd: s.clipEnd,
+        fx: JSON.parse(JSON.stringify(s.fx)),
+        silenceRegions: s.silenceRegions.map(function(r) {
+          return { id: r.id, start: r.start, end: r.end };
+        }),
+        volumeRegions: (s.volumeRegions || []).map(function(r) {
+          return { id: r.id, start: r.start, end: r.end, level: r.level };
+        })
+      });
+    }
+
+    return {
+      version: 1,
+      created: new Date().toISOString(),
+      library: libData,
+      tracks: tracksData,
+      bookmarks: bookmarks.map(function(b) { return { id: b.id, time: b.time }; }),
+      masterFx: JSON.parse(JSON.stringify(masterFxSettings)),
+      zoom: pixelsPerSecond,
+      trimStart: trimStartRatio,
+      trimEnd: trimEndRatio,
+      playhead: playheadRatio,
+      fadeIn: parseFloat(fadeInRange.value) || 0,
+      fadeOut: parseFloat(fadeOutRange.value) || 0,
+      nextIds: {
+        fileId: nextFileId,
+        slotId: nextSlotId,
+        silenceRegionId: nextSilenceRegionId,
+        volumeRegionId: nextVolumeRegionId,
+        bookmarkId: nextBookmarkId
+      }
+    };
+  }
+
+  saveProjectBtn.addEventListener('click', async function() {
+    if (libraryFiles.length === 0 && trackSlots.length === 0) {
+      showError(errorBox, 'Nothing to save. Add some files and tracks first.');
+      return;
+    }
+    saveProjectBtn.disabled = true;
+    saveProjectBtn.textContent = 'Saving...';
+    progressWrap.classList.add('active');
+    hideError(errorBox);
+
+    try {
+      sp(10, 'Encoding audio data...');
+      var projectData = await serializeProject();
+
+      sp(70, 'Building project file...');
+      var json = JSON.stringify(projectData);
+
+      sp(90, 'Preparing download...');
+      var blob = new Blob([json], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'project_' + Date.now() + '.mp3master';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      sp(100, 'Project saved! (' + formatSize(blob.size) + ')');
+    } catch (err) {
+      showError(errorBox, 'Failed to save project: ' + err.message);
+    } finally {
+      saveProjectBtn.disabled = false;
+      saveProjectBtn.textContent = 'Save Project';
+      setTimeout(function() { progressWrap.classList.remove('active'); }, 2000);
+    }
+  });
+
+  async function loadProject(data) {
+    // Stop any current playback
+    if (isPlaying) stopPlayback();
+
+    progressWrap.classList.add('active');
+    sp(5, 'Loading project...');
+
+    // Create AudioContext for decoding
+    var actx = new (window.AudioContext || window.webkitAudioContext)();
+
+    // 1. Restore library files
+    libraryFiles = [];
+    for (var i = 0; i < data.library.length; i++) {
+      var entry = data.library[i];
+      sp(5 + Math.round((i / data.library.length) * 60), 'Decoding ' + entry.name + '...');
+      var arrayBuf = base64ToArrayBuffer(entry.audioBase64);
+      var buffer = await actx.decodeAudioData(arrayBuf);
+      libraryFiles.push({
+        id: entry.id,
+        file: null,
+        buffer: buffer,
+        name: entry.name,
+        duration: entry.duration || buffer.duration,
+        size: entry.size || 0,
+        analysis: entry.analysis || null
+      });
+    }
+    actx.close();
+
+    sp(70, 'Restoring tracks...');
+
+    // 2. Restore track slots
+    trackSlots = [];
+    for (var i = 0; i < data.tracks.length; i++) {
+      var t = data.tracks[i];
+      trackSlots.push({
+        id: t.id,
+        assignedFileId: t.assignedFileId,
+        volume: t.volume != null ? t.volume : 1.0,
+        pan: t.pan != null ? t.pan : 0,
+        canvas: null,
+        gainNode: null,
+        panNode: null,
+        sourceNode: null,
+        fx: t.fx || createDefaultFxSettings(),
+        fxChainNodes: null,
+        startOffset: t.startOffset || 0,
+        clipStart: t.clipStart || 0,
+        clipEnd: t.clipEnd != null ? t.clipEnd : null,
+        silenceRegions: (t.silenceRegions || []).map(function(r) {
+          return { id: r.id, start: r.start, end: r.end };
+        }),
+        volumeRegions: (t.volumeRegions || []).map(function(r) {
+          return { id: r.id, start: r.start, end: r.end, level: r.level };
+        })
+      });
+    }
+
+    // 3. Restore bookmarks
+    bookmarks = (data.bookmarks || []).map(function(b) {
+      return { id: b.id, time: b.time };
+    });
+
+    // 4. Restore master FX
+    if (data.masterFx) {
+      masterFxSettings = data.masterFx;
+    }
+
+    // 5. Restore ID counters
+    if (data.nextIds) {
+      nextFileId = data.nextIds.fileId || 0;
+      nextSlotId = data.nextIds.slotId || 0;
+      nextSilenceRegionId = data.nextIds.silenceRegionId || 0;
+      nextVolumeRegionId = data.nextIds.volumeRegionId || 0;
+      nextBookmarkId = data.nextIds.bookmarkId || 0;
+    }
+
+    // 6. Restore editor state
+    pixelsPerSecond = data.zoom || 100;
+    trimStartRatio = data.trimStart != null ? data.trimStart : 0;
+    trimEndRatio = data.trimEnd != null ? data.trimEnd : 1;
+    playheadRatio = data.playhead || 0;
+    fadeInRange.value = data.fadeIn || 0;
+    fadeOutRange.value = data.fadeOut || 0;
+    fadeInVal.textContent = (data.fadeIn || 0) + 's';
+    fadeOutVal.textContent = (data.fadeOut || 0) + 's';
+
+    sp(85, 'Rebuilding UI...');
+
+    // 7. Update upload area
+    if (libraryFiles.length > 0) {
+      uploadArea.classList.add('has-file');
+      fileNameEl.textContent = libraryFiles.length + ' file' + (libraryFiles.length !== 1 ? 's' : '') + ' in library';
+    } else {
+      uploadArea.classList.remove('has-file');
+      fileNameEl.textContent = '';
+    }
+
+    // 8. Rebuild everything
+    rebuildLibraryUI();
+    rebuildTracksUI();
+    recalcDuration();
+    buildWaveformLanes();
+    drawAllWaveforms();
+    updateTrimUI();
+    updatePlayheadUI();
+    applyZoom();
+    renderBookmarks();
+    updateTrackCount();
+
+    // Update zoom slider UI
+    var zoomSlider = document.getElementById('ed-zoomSlider');
+    if (zoomSlider) zoomSlider.value = pixelsPerSecond;
+    var zoomVal = document.getElementById('ed-zoomVal');
+    if (zoomVal) zoomVal.textContent = pixelsPerSecond + ' px/s';
+
+    sp(100, 'Project loaded!');
+    setTimeout(function() { progressWrap.classList.remove('active'); }, 2000);
+  }
+
+  loadProjectBtn.addEventListener('click', function() {
+    loadProjectInput.click();
+  });
+
+  loadProjectInput.addEventListener('change', async function() {
+    var file = loadProjectInput.files[0];
+    if (!file) return;
+    hideError(errorBox);
+
+    try {
+      sp(2, 'Reading project file...');
+      var text = await file.text();
+      var data = JSON.parse(text);
+      if (!data.version || !data.library || !data.tracks) {
+        throw new Error('Invalid project file format');
+      }
+      await loadProject(data);
+    } catch (err) {
+      showError(errorBox, 'Failed to load project: ' + err.message);
+      progressWrap.classList.remove('active');
+    }
+    loadProjectInput.value = '';
   });
 
   /* ═══════════════════════════════════════════════
